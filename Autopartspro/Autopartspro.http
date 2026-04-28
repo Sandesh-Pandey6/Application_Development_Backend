@@ -1,6 +1,0 @@
-@Autopartspro_HostAddress = http://localhost:5009
-
-GET {{Autopartspro_HostAddress}}/weatherforecast/
-Accept: application/json
-
-###
