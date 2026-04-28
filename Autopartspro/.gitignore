@@ -1,0 +1,54 @@
+# Build folders
+bin/
+obj/
+
+# Visual Studio files
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Rider / VS Code
+.idea/
+.vscode/
+
+# NuGet packages
+packages/
+*.nupkg
+
+# Logs
+*.log
+
+# ASP.NET Core secrets
+secrets.json
+
+# Environment files
+.env
+.env.*
+
+# Publish output
+publish/
+
+# Temporary files
+*.tmp
+*.temp
+
+# OS generated files
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# Entity Framework migrations snapshot temp files
+*.dbmdl
+*.jfm
+
+# Test results
+TestResults/
+
+# Coverage files
+coverage/
+*.coverage
+*.coveragexml
+
+.vs/
