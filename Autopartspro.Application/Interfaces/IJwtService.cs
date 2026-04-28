@@ -1,10 +1,10 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
+﻿using Autopartspro.Domain.Entities;
 
-namespace Autopartspro.Application.Interfaces
+namespace Autopartspro.Application.Interfaces;
+
+public interface IJwtService
 {
-    internal interface IJwtService
-    {
-    }
+    string GenerateToken(User user);
+    string GenerateRefreshToken();
+    bool ValidateToken(string token, out string userId);
 }

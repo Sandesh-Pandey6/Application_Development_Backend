@@ -1,10 +1,7 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
+﻿namespace Autopartspro.Application.Interfaces;
 
-namespace Autopartspro.Application.Interfaces
+public interface IEmailService
 {
-    internal interface IEmailService
-    {
-    }
-}
+    Task SendOtpEmailAsync(string toEmail, string fullName, string otpCode);
+    Task SendGenericEmailAsync(string toEmail, string subject, string htmlBody);
+} 

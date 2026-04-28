@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("Autopartspro.Application")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+13cf1aa873ad17756190b3f8b431d2280af8081b")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+4b34561131d628c8ee1f0eb013e4d7a50f715bc7")]
 [assembly: System.Reflection.AssemblyProductAttribute("Autopartspro.Application")]
 [assembly: System.Reflection.AssemblyTitleAttribute("Autopartspro.Application")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

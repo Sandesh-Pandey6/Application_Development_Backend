@@ -50,3 +50,5 @@ TestResults/
 coverage/
 *.coverage
 *.coveragexml
+
+.vs/
