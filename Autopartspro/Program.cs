@@ -62,6 +62,9 @@ builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IJwtService, JwtService>();
 builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddScoped<IOtpService, OtpService>();   // ← was missing
+builder.Services.AddScoped<ICustomerService, CustomerService>();
+builder.Services.AddScoped<IReportService, ReportService>();
+builder.Services.AddScoped<ISalesInvoiceService, SalesInvoiceService>();
 builder.Services.AddTransient<GlobalExceptionHandler>();
 
 // ── OpenAPI (.NET 10 built-in) ────────────────────────────

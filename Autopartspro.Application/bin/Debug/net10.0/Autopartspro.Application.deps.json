@@ -1,0 +1,39 @@
+{
+  "runtimeTarget": {
+    "name": ".NETCoreApp,Version=v10.0",
+    "signature": ""
+  },
+  "compilationOptions": {},
+  "targets": {
+    ".NETCoreApp,Version=v10.0": {
+      "Autopartspro.Application/1.0.0": {
+        "dependencies": {
+          "Autopartspro.Domain": "1.0.0"
+        },
+        "runtime": {
+          "Autopartspro.Application.dll": {}
+        }
+      },
+      "Autopartspro.Domain/1.0.0": {
+        "runtime": {
+          "Autopartspro.Domain.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.0.0"
+          }
+        }
+      }
+    }
+  },
+  "libraries": {
+    "Autopartspro.Application/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "Autopartspro.Domain/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    }
+  }
+}
