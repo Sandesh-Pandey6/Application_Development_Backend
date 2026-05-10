@@ -1,0 +1,12 @@
+/Users/ganeshchand/Downloads/Application_Development_Backend-abisha 2/Application_Development_Backend/Autopartspro.Domain/bin/Debug/net10.0/Autopartspro.Domain.deps.json
+/Users/ganeshchand/Downloads/Application_Development_Backend-abisha 2/Application_Development_Backend/Autopartspro.Domain/bin/Debug/net10.0/Autopartspro.Domain.dll
+/Users/ganeshchand/Downloads/Application_Development_Backend-abisha 2/Application_Development_Backend/Autopartspro.Domain/bin/Debug/net10.0/Autopartspro.Domain.pdb
+/Users/ganeshchand/Downloads/Application_Development_Backend-abisha 2/Application_Development_Backend/Autopartspro.Domain/obj/Debug/net10.0/Autopartspro.Domain.GeneratedMSBuildEditorConfig.editorconfig
+/Users/ganeshchand/Downloads/Application_Development_Backend-abisha 2/Application_Development_Backend/Autopartspro.Domain/obj/Debug/net10.0/Autopartspro.Domain.AssemblyInfoInputs.cache
+/Users/ganeshchand/Downloads/Application_Development_Backend-abisha 2/Application_Development_Backend/Autopartspro.Domain/obj/Debug/net10.0/Autopartspro.Domain.AssemblyInfo.cs
+/Users/ganeshchand/Downloads/Application_Development_Backend-abisha 2/Application_Development_Backend/Autopartspro.Domain/obj/Debug/net10.0/Autopartspro.Domain.csproj.CoreCompileInputs.cache
+/Users/ganeshchand/Downloads/Application_Development_Backend-abisha 2/Application_Development_Backend/Autopartspro.Domain/obj/Debug/net10.0/Autopartspro.Domain.sourcelink.json
+/Users/ganeshchand/Downloads/Application_Development_Backend-abisha 2/Application_Development_Backend/Autopartspro.Domain/obj/Debug/net10.0/Autopartspro.Domain.dll
+/Users/ganeshchand/Downloads/Application_Development_Backend-abisha 2/Application_Development_Backend/Autopartspro.Domain/obj/Debug/net10.0/refint/Autopartspro.Domain.dll
+/Users/ganeshchand/Downloads/Application_Development_Backend-abisha 2/Application_Development_Backend/Autopartspro.Domain/obj/Debug/net10.0/Autopartspro.Domain.pdb
+/Users/ganeshchand/Downloads/Application_Development_Backend-abisha 2/Application_Development_Backend/Autopartspro.Domain/obj/Debug/net10.0/ref/Autopartspro.Domain.dll

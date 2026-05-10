@@ -1,0 +1,16 @@
+/Users/ganeshchand/Downloads/Application_Development_Backend-abisha 2/Application_Development_Backend/Autopartspro.Application/bin/Debug/net10.0/Autopartspro.Application.deps.json
+/Users/ganeshchand/Downloads/Application_Development_Backend-abisha 2/Application_Development_Backend/Autopartspro.Application/bin/Debug/net10.0/Autopartspro.Application.dll
+/Users/ganeshchand/Downloads/Application_Development_Backend-abisha 2/Application_Development_Backend/Autopartspro.Application/bin/Debug/net10.0/Autopartspro.Application.pdb
+/Users/ganeshchand/Downloads/Application_Development_Backend-abisha 2/Application_Development_Backend/Autopartspro.Application/bin/Debug/net10.0/Autopartspro.Domain.dll
+/Users/ganeshchand/Downloads/Application_Development_Backend-abisha 2/Application_Development_Backend/Autopartspro.Application/bin/Debug/net10.0/Autopartspro.Domain.pdb
+/Users/ganeshchand/Downloads/Application_Development_Backend-abisha 2/Application_Development_Backend/Autopartspro.Application/obj/Debug/net10.0/Autopartspro.Application.csproj.AssemblyReference.cache
+/Users/ganeshchand/Downloads/Application_Development_Backend-abisha 2/Application_Development_Backend/Autopartspro.Application/obj/Debug/net10.0/Autopartspro.Application.GeneratedMSBuildEditorConfig.editorconfig
+/Users/ganeshchand/Downloads/Application_Development_Backend-abisha 2/Application_Development_Backend/Autopartspro.Application/obj/Debug/net10.0/Autopartspro.Application.AssemblyInfoInputs.cache
+/Users/ganeshchand/Downloads/Application_Development_Backend-abisha 2/Application_Development_Backend/Autopartspro.Application/obj/Debug/net10.0/Autopartspro.Application.AssemblyInfo.cs
+/Users/ganeshchand/Downloads/Application_Development_Backend-abisha 2/Application_Development_Backend/Autopartspro.Application/obj/Debug/net10.0/Autopartspro.Application.csproj.CoreCompileInputs.cache
+/Users/ganeshchand/Downloads/Application_Development_Backend-abisha 2/Application_Development_Backend/Autopartspro.Application/obj/Debug/net10.0/Autopartspro.Application.sourcelink.json
+/Users/ganeshchand/Downloads/Application_Development_Backend-abisha 2/Application_Development_Backend/Autopartspro.Application/obj/Debug/net10.0/Autopart.8C6749D8.Up2Date
+/Users/ganeshchand/Downloads/Application_Development_Backend-abisha 2/Application_Development_Backend/Autopartspro.Application/obj/Debug/net10.0/Autopartspro.Application.dll
+/Users/ganeshchand/Downloads/Application_Development_Backend-abisha 2/Application_Development_Backend/Autopartspro.Application/obj/Debug/net10.0/refint/Autopartspro.Application.dll
+/Users/ganeshchand/Downloads/Application_Development_Backend-abisha 2/Application_Development_Backend/Autopartspro.Application/obj/Debug/net10.0/Autopartspro.Application.pdb
+/Users/ganeshchand/Downloads/Application_Development_Backend-abisha 2/Application_Development_Backend/Autopartspro.Application/obj/Debug/net10.0/ref/Autopartspro.Application.dll
