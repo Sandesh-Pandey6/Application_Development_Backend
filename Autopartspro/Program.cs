@@ -9,15 +9,15 @@ using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// ── Controllers ───────────────────────────────────────────
+// Controllers
 builder.Services.AddControllers();
 
-// ── Database (PostgreSQL) ─────────────────────────────────
+//  Database (PostgreSQL) 
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration
         .GetConnectionString("DefaultConnection")));
 
-// ── JWT Authentication ────────────────────────────────────
+// JWT Authentication 
 var jwtSettings = builder.Configuration.GetSection("JwtSettings");
 var secretKey = jwtSettings["SecretKey"]!;
 
@@ -57,36 +57,37 @@ builder.Services.AddCors(options =>
               .AllowCredentials());
 });
 
-// ── DI Services ───────────────────────────────────────────
+// DI Services 
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IJwtService, JwtService>();
 builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddScoped<IOtpService, OtpService>();   // ← was missing
 builder.Services.AddTransient<GlobalExceptionHandler>();
+builder.Services.AddScoped<IAdminService, AdminService>();
 
-// ── OpenAPI (.NET 10 built-in) ────────────────────────────
+// OpenAPI (.NET 10 built-in)
 builder.Services.AddOpenApi();
 
-// ─────────────────────────────────────────────────────────
+
 var app = builder.Build();
 
-// ── Global Exception Handler ──────────────────────────────
+// ── Global Exception Handler ─
 app.UseMiddleware<GlobalExceptionHandler>();
 
-// ── OpenAPI UI (dev only) ─────────────────────────────────
+// OpenAPI UI (dev only)
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
 }
 
-// ── Middleware Pipeline ───────────────────────────────────
+// Middleware Pipeline 
 app.UseHttpsRedirection();
 app.UseCors("AllowFrontend");
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 
-// ── Auto-run migrations on startup ────────────────────────
+//  Auto-run migrations on startup
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();

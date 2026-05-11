@@ -1,4 +1,5 @@
 ﻿using Autopartspro.Domain.Entities;
+using Autopartspro.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
 
 namespace Autopartspro.Infrastructure.Data
@@ -21,6 +22,8 @@ namespace Autopartspro.Infrastructure.Data
         public DbSet<Review> Reviews => Set<Review>();
         public DbSet<Notification> Notifications => Set<Notification>();
         public DbSet<OtpVerification> OtpVerifications => Set<OtpVerification>();
+        public PurchaseInvoiceStatus Status { get; set; } = PurchaseInvoiceStatus.Pending;
+
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

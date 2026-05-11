@@ -1,3 +1,5 @@
+using Autopartspro.Domain.Enums;
+
 namespace Autopartspro.Domain.Entities
 {
     public class PurchaseInvoice : BaseEntity
@@ -7,6 +9,7 @@ namespace Autopartspro.Domain.Entities
         public Guid AdminId { get; set; }
         public decimal TotalAmount { get; set; }
         public DateTime PurchaseDate { get; set; }
+        public PurchaseInvoiceStatus Status { get; set; } = PurchaseInvoiceStatus.Pending; // ← ADD THIS
 
         // Navigation Properties
         public Vendor Vendor { get; set; } = null!;
