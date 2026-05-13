@@ -29,7 +29,7 @@ namespace Autopartspro.Infrastructure.Data
         {
             base.OnModelCreating(modelBuilder);
 
-            // ── Unique constraints ──────────────────────────────
+            //  Unique constraints 
             modelBuilder.Entity<User>()
                 .HasIndex(u => u.Email).IsUnique();
 
@@ -45,7 +45,7 @@ namespace Autopartspro.Infrastructure.Data
             modelBuilder.Entity<PurchaseInvoice>()
                 .HasIndex(p => p.InvoiceNumber).IsUnique();
 
-            // ── Decimal precision ───────────────────────────────
+            //  Decimal precision 
             modelBuilder.Entity<Part>()
                 .Property(p => p.Price).HasPrecision(18, 2);
 
@@ -69,35 +69,35 @@ namespace Autopartspro.Infrastructure.Data
             modelBuilder.Entity<PurchaseInvoiceItem>()
                 .Property(p => p.SubTotal).HasPrecision(18, 2);
 
-            // ── StaffEmployment → User (one-to-one) ─────────────
+            //  StaffEmployment → User (one-to-one) 
             modelBuilder.Entity<StaffEmployment>()
                 .HasOne(s => s.User)
                 .WithOne(u => u.StaffEmployment)
                 .HasForeignKey<StaffEmployment>(s => s.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
 
-            // ── SalesInvoice → Customer ─────────────────────────
+            //  SalesInvoice → Customer 
             modelBuilder.Entity<SalesInvoice>()
                 .HasOne(s => s.Customer)
                 .WithMany(u => u.CustomerInvoices)
                 .HasForeignKey(s => s.CustomerId)
                 .OnDelete(DeleteBehavior.Restrict);
 
-            // ── SalesInvoice → Staff ────────────────────────────
+            //  SalesInvoice → Staff 
             modelBuilder.Entity<SalesInvoice>()
                 .HasOne(s => s.Staff)
                 .WithMany(u => u.StaffInvoices)
                 .HasForeignKey(s => s.StaffId)
                 .OnDelete(DeleteBehavior.Restrict);
 
-            // ── PurchaseInvoice → Admin ─────────────────────────
+            //  PurchaseInvoice → Admin
             modelBuilder.Entity<PurchaseInvoice>()
                 .HasOne(p => p.Admin)
                 .WithMany(u => u.PurchaseInvoices)
                 .HasForeignKey(p => p.AdminId)
                 .OnDelete(DeleteBehavior.Restrict);
 
-            // ── Review optional FKs ─────────────────────────────
+            //  Review optional FKs 
             modelBuilder.Entity<Review>()
                 .HasOne(r => r.RelatedInvoice)
                 .WithMany(s => s.Reviews)
@@ -110,7 +110,7 @@ namespace Autopartspro.Infrastructure.Data
                 .HasForeignKey(r => r.RelatedAppointmentId)
                 .OnDelete(DeleteBehavior.SetNull);
 
-            // ── OTP → User (by email) ───────────────────────────
+            // OTP → User (by email)
             modelBuilder.Entity<OtpVerification>()
                 .HasIndex(o => new { o.Email, o.Purpose });
 

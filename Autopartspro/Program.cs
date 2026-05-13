@@ -44,7 +44,7 @@ builder.Services.AddAuthentication(options =>
 
 builder.Services.AddAuthorization();
 
-// ── CORS ──────────────────────────────────────────────────
+// CORS
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontend", policy =>
@@ -71,7 +71,7 @@ builder.Services.AddOpenApi();
 
 var app = builder.Build();
 
-// ── Global Exception Handler ─
+// Global Exception Handler ─
 app.UseMiddleware<GlobalExceptionHandler>();
 
 // OpenAPI UI (dev only)

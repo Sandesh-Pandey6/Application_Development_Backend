@@ -21,7 +21,7 @@ namespace Autopartspro.Controllers
         private Guid GetAdminId() =>
             Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
-        // ── Dashboard ──────────────────────────────────────────
+        // Dashboard 
         [HttpGet("dashboard")]
         public async Task<IActionResult> GetDashboard()
         {
@@ -79,7 +79,7 @@ namespace Autopartspro.Controllers
             return Ok(new { message = result });
         }
 
-        // ── Parts & Inventory ──────────────────────────────────
+        //  Parts & Inventory 
         [HttpGet("parts")]
         public async Task<IActionResult> GetAllParts(
             [FromQuery] string? search,
@@ -121,7 +121,7 @@ namespace Autopartspro.Controllers
             return Ok(new { message = result });
         }
 
-        // ── Purchase Invoices ──────────────────────────────────
+        //  Purchase Invoices 
         [HttpGet("purchase-invoices")]
         public async Task<IActionResult> GetAllPurchaseInvoices()
         {
@@ -152,7 +152,7 @@ namespace Autopartspro.Controllers
             return Ok(new { message = result });
         }
 
-        // ── Financial Reports ──────────────────────────────────
+        //  Financial Reports
         [HttpGet("financial-reports")]
         public async Task<IActionResult> GetFinancialReport(
             [FromQuery] string period = "monthly",
@@ -162,7 +162,7 @@ namespace Autopartspro.Controllers
             return Ok(result);
         }
 
-        // ── Inventory Reports ──────────────────────────────────
+        //  Inventory Reports 
         [HttpGet("inventory-reports")]
         public async Task<IActionResult> GetInventoryReport()
         {
@@ -170,7 +170,7 @@ namespace Autopartspro.Controllers
             return Ok(result);
         }
 
-        // ── Notifications ──────────────────────────────────────
+        //  Notifications 
         [HttpGet("notifications")]
         public async Task<IActionResult> GetNotifications([FromQuery] string? type)
         {
