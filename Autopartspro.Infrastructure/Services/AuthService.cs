@@ -1,4 +1,4 @@
-﻿using Autopartspro.Application.DOTs.auth;
+using Autopartspro.Application.DOTs.auth;
 using Autopartspro.Application.Interfaces;
 using Autopartspro.Domain.Entities;
 using Autopartspro.Domain.Enums;
@@ -23,9 +23,9 @@ namespace Autopartspro.Infrastructure.Services
             _emailService = emailService;
         }
 
-        // ══════════════════════════════════════════════════════
+       
         // REGISTER — Step 1
-        // ══════════════════════════════════════════════════════
+      
         public async Task<string> RegisterAsync(RegisterDto dto)
         {
             if (!dto.AgreeToTerms)
@@ -40,14 +40,24 @@ namespace Autopartspro.Infrastructure.Services
             if (existingUser != null && existingUser.IsEmailVerified)
                 throw new Exception("Email is already registered.");
 
+            var role = dto.Role == "Staff" ? RoleType.Staff : RoleType.Customer;
+
+            // Prevent duplicate number plates for customers
+            if (role == RoleType.Customer && !string.IsNullOrEmpty(dto.NumberPlate))
+            {
+                var existingVehicle = await _context.Vehicles
+                    .FirstOrDefaultAsync(v => v.NumberPlate == dto.NumberPlate);
+                
+                if (existingVehicle != null && (existingUser == null || existingVehicle.CustomerId != existingUser.Id))
+                    throw new Exception("This Number Plate is already registered to another account.");
+            }
+
             // Remove unverified duplicate
             if (existingUser != null && !existingUser.IsEmailVerified)
             {
                 _context.Users.Remove(existingUser);
                 await _context.SaveChangesAsync();
             }
-
-            var role = dto.Role == "Staff" ? RoleType.Staff : RoleType.Customer;
 
             var user = new User
             {
@@ -130,8 +140,8 @@ namespace Autopartspro.Infrastructure.Services
             user.UpdatedAt = DateTime.UtcNow;
             await _context.SaveChangesAsync();
 
-            // Send welcome email
-            await _emailService.SendWelcomeEmailAsync(user.Email, user.FullName);
+            // Send welcome email in the background
+            _ = Task.Run(() => _emailService.SendWelcomeEmailAsync(user.Email, user.FullName));
 
             var token = _jwtService.GenerateToken(user);
 
@@ -145,9 +155,9 @@ namespace Autopartspro.Infrastructure.Services
             };
         }
 
-        // ══════════════════════════════════════════════════════
+        // 
         // LOGIN — Step 1
-        // ══════════════════════════════════════════════════════
+        // 
         public async Task<string> LoginAsync(LoginDto dto)
         {
             var user = await _context.Users

@@ -42,8 +42,13 @@ namespace Autopartspro.Infrastructure.Services
             _context.OtpVerifications.Add(otp);
             await _context.SaveChangesAsync();
 
-            // Send OTP email
-            await _emailService.SendOtpEmailAsync(email, otpCode, purpose.ToString());
+            // ⚠️ DEBUG LOG - So you can see the OTP in your terminal!
+            Console.WriteLine($"\n==========================================");
+            Console.WriteLine($"🔑 OTP FOR {email}: {otpCode}");
+            Console.WriteLine($"==========================================\n");
+
+            // Send OTP email in the background to make the API super fast
+            _ = Task.Run(() => _emailService.SendOtpEmailAsync(email, otpCode, purpose.ToString()));
 
             return "OTP sent successfully to " + email;
         }

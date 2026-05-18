@@ -18,12 +18,12 @@ namespace Autopartspro.Infrastructure.Services
         public EmailService(IConfiguration config)
         {
             _config = config;
-            _senderEmail = config["EmailSettings:SenderEmail"] ?? "";
-            _senderName = config["EmailSettings:SenderName"] ?? "AutoPartsPro";
-            _smtpHost = config["EmailSettings:SmtpHost"] ?? "smtp.gmail.com";
-            _smtpPort = int.Parse(config["EmailSettings:SmtpPort"] ?? "587");
-            _smtpUser = config["EmailSettings:SmtpUser"] ?? "";
-            _smtpPass = config["EmailSettings:SmtpPass"] ?? "";
+            _senderEmail = config["SmtpSettings:SenderEmail"] ?? "";
+            _senderName = config["SmtpSettings:SenderName"] ?? "AutoPartsPro";
+            _smtpHost = config["SmtpSettings:Host"] ?? "smtp.gmail.com";
+            _smtpPort = int.Parse(config["SmtpSettings:Port"] ?? "587");
+            _smtpUser = config["SmtpSettings:Username"] ?? "";
+            _smtpPass = (config["SmtpSettings:Password"] ?? "").Replace(" ", "");
         }
 
         // ── Core send method ──────────────────────────────────────
@@ -31,8 +31,10 @@ namespace Autopartspro.Infrastructure.Services
         {
             using var client = new SmtpClient(_smtpHost, _smtpPort)
             {
+                UseDefaultCredentials = false,
                 Credentials = new NetworkCredential(_smtpUser, _smtpPass),
-                EnableSsl = true
+                EnableSsl = true,
+                DeliveryMethod = SmtpDeliveryMethod.Network
             };
 
             var mailMessage = new MailMessage
@@ -44,7 +46,20 @@ namespace Autopartspro.Infrastructure.Services
             };
 
             mailMessage.To.Add(toEmail);
-            await client.SendMailAsync(mailMessage);
+            
+            try
+            {
+                await client.SendMailAsync(mailMessage);
+                Console.WriteLine($"✅ Email sent successfully to {toEmail}");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ SMTP ERROR sending to {toEmail}: {ex.Message}");
+                if (ex.InnerException != null)
+                {
+                    Console.WriteLine($"❌ Inner Exception: {ex.InnerException.Message}");
+                }
+            }
         }
 
         // ── OTP Email ─────────────────────────────────────────────
@@ -197,8 +212,10 @@ namespace Autopartspro.Infrastructure.Services
 
             using var client = new SmtpClient(_smtpHost, _smtpPort)
             {
+                UseDefaultCredentials = false,
                 Credentials = new NetworkCredential(_smtpUser, _smtpPass),
-                EnableSsl = true
+                EnableSsl = true,
+                DeliveryMethod = SmtpDeliveryMethod.Network
             };
 
             var mailMessage = new MailMessage
@@ -216,7 +233,15 @@ namespace Autopartspro.Infrastructure.Services
             mailMessage.Attachments.Add(
                 new Attachment(ms, $"{invoiceNumber}.pdf", "application/pdf"));
 
-            await client.SendMailAsync(mailMessage);
+            try
+            {
+                await client.SendMailAsync(mailMessage);
+                Console.WriteLine($"✅ Invoice sent successfully to {toEmail}");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ SMTP ERROR sending invoice to {toEmail}: {ex.Message}");
+            }
         }
 
         // ── Low Stock Alert Email ─────────────────────────────────
