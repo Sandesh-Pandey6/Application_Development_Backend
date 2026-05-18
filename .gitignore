@@ -1,5 +1,55 @@
+# =========================================================================
+# Core .NET & Visual Studio
+# =========================================================================
+bin/
+obj/
 .vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+.vscode/
+.idea/
 
-# Build results
-[Bb]in/
-[Oo]bj/
+# NuGet
+packages/
+*.nupkg
+
+# Publish output
+publish/
+out/
+
+# Environment / Secrets
+.env
+.env.*
+secrets.json
+appsettings.*.secret.json
+
+# Logs & Temp files
+*.log
+*.tmp
+*.temp
+
+# Test results
+TestResults/
+coverage/
+*.coverage
+*.coveragexml
+
+# OS files
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# =========================================================================
+# Project-specific folders
+# =========================================================================
+
+# Reports
+/GeneratedReports/
+
+# Invoices
+/GeneratedInvoices/
+
+# Uploads (if user-generated files are not tracked)
+/Uploads/
