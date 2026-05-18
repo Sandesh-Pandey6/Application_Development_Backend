@@ -1,13 +1,12 @@
-using System.Net;
-using System.Net.Mail;
 using Autopartspro.Application.Interfaces;
+using MailKit.Net.Smtp;
 using Microsoft.Extensions.Configuration;
+using MimeKit;
 
 namespace Autopartspro.Infrastructure.Services
 {
     public class EmailService : IEmailService
     {
-        private readonly IConfiguration _config;
         private readonly string _senderEmail;
         private readonly string _senderName;
         private readonly string _smtpHost;
@@ -17,37 +16,35 @@ namespace Autopartspro.Infrastructure.Services
 
         public EmailService(IConfiguration config)
         {
-            _config = config;
-            _senderEmail = config["EmailSettings:SenderEmail"] ?? "";
-            _senderName = config["EmailSettings:SenderName"] ?? "AutoPartsPro";
-            _smtpHost = config["EmailSettings:SmtpHost"] ?? "smtp.gmail.com";
-            _smtpPort = int.Parse(config["EmailSettings:SmtpPort"] ?? "587");
-            _smtpUser = config["EmailSettings:SmtpUser"] ?? "";
-            _smtpPass = config["EmailSettings:SmtpPass"] ?? "";
+            _senderEmail = config["SmtpSettings:SenderEmail"] ?? "";
+            _senderName = config["SmtpSettings:SenderName"] ?? "AutoPartsPro";
+            _smtpHost = config["SmtpSettings:Host"] ?? "smtp.gmail.com";
+            _smtpPort = int.Parse(config["SmtpSettings:Port"] ?? "587");
+            _smtpUser = config["SmtpSettings:Username"] ?? "";
+            _smtpPass = config["SmtpSettings:Password"] ?? "";
         }
 
-        // ── Core send method ──────────────────────────────────────
+        private async Task SendMimeMessageAsync(MimeMessage message)
+        {
+            using var client = new SmtpClient();
+            await client.ConnectAsync(_smtpHost, _smtpPort, MailKit.Security.SecureSocketOptions.StartTls);
+            await client.AuthenticateAsync(_smtpUser, _smtpPass);
+            await client.SendAsync(message);
+            await client.DisconnectAsync(true);
+        }
+
         public async Task SendEmailAsync(string toEmail, string subject, string body)
         {
-            using var client = new SmtpClient(_smtpHost, _smtpPort)
-            {
-                Credentials = new NetworkCredential(_smtpUser, _smtpPass),
-                EnableSsl = true
-            };
+            var message = new MimeMessage();
+            message.From.Add(new MailboxAddress(_senderName, _senderEmail));
+            message.To.Add(MailboxAddress.Parse(toEmail));
+            message.Subject = subject;
 
-            var mailMessage = new MailMessage
-            {
-                From = new MailAddress(_senderEmail, _senderName),
-                Subject = subject,
-                Body = body,
-                IsBodyHtml = true
-            };
+            message.Body = new TextPart("html") { Text = body };
 
-            mailMessage.To.Add(toEmail);
-            await client.SendMailAsync(mailMessage);
+            await SendMimeMessageAsync(message);
         }
 
-        // ── OTP Email ─────────────────────────────────────────────
         public async Task SendOtpEmailAsync(string toEmail, string otpCode, string purpose)
         {
             var purposeText = purpose switch
@@ -98,7 +95,6 @@ namespace Autopartspro.Infrastructure.Services
             await SendEmailAsync(toEmail, subject, body);
         }
 
-        // ── Welcome Email ─────────────────────────────────────────
         public async Task SendWelcomeEmailAsync(string toEmail, string fullName)
         {
             var subject = "Welcome to AutoPartsPro!";
@@ -128,7 +124,6 @@ namespace Autopartspro.Infrastructure.Services
             await SendEmailAsync(toEmail, subject, body);
         }
 
-        // ── Staff Approval Email ──────────────────────────────────
         public async Task SendStaffApprovalEmailAsync(string toEmail, string fullName)
         {
             var subject = "Your Staff Account Has Been Approved - AutoPartsPro";
@@ -151,7 +146,6 @@ namespace Autopartspro.Infrastructure.Services
             await SendEmailAsync(toEmail, subject, body);
         }
 
-        // ── Staff Rejection Email ─────────────────────────────────
         public async Task SendStaffRejectionEmailAsync(string toEmail, string fullName)
         {
             var subject = "Your Staff Account Request - AutoPartsPro";
@@ -174,12 +168,15 @@ namespace Autopartspro.Infrastructure.Services
             await SendEmailAsync(toEmail, subject, body);
         }
 
-        // ── Invoice Email ─────────────────────────────────────────
         public async Task SendInvoiceEmailAsync(string toEmail, string fullName,
             string invoiceNumber, byte[] invoicePdf)
         {
-            var subject = $"Your Invoice {invoiceNumber} - AutoPartsPro";
-            var body = $@"
+            var message = new MimeMessage();
+            message.From.Add(new MailboxAddress(_senderName, _senderEmail));
+            message.To.Add(MailboxAddress.Parse(toEmail));
+            message.Subject = $"Your Invoice {invoiceNumber} - AutoPartsPro";
+
+            var bodyHtml = $@"
             <!DOCTYPE html>
             <html>
             <body style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;'>
@@ -195,31 +192,13 @@ namespace Autopartspro.Infrastructure.Services
             </body>
             </html>";
 
-            using var client = new SmtpClient(_smtpHost, _smtpPort)
-            {
-                Credentials = new NetworkCredential(_smtpUser, _smtpPass),
-                EnableSsl = true
-            };
+            var bodyBuilder = new BodyBuilder { HtmlBody = bodyHtml };
+            bodyBuilder.Attachments.Add($"{invoiceNumber}.pdf", invoicePdf, ContentType.Parse("application/pdf"));
+            message.Body = bodyBuilder.ToMessageBody();
 
-            var mailMessage = new MailMessage
-            {
-                From = new MailAddress(_senderEmail, _senderName),
-                Subject = subject,
-                Body = body,
-                IsBodyHtml = true
-            };
-
-            mailMessage.To.Add(toEmail);
-
-            // Attach PDF invoice
-            using var ms = new MemoryStream(invoicePdf);
-            mailMessage.Attachments.Add(
-                new Attachment(ms, $"{invoiceNumber}.pdf", "application/pdf"));
-
-            await client.SendMailAsync(mailMessage);
+            await SendMimeMessageAsync(message);
         }
 
-        // ── Low Stock Alert Email ─────────────────────────────────
         public async Task SendLowStockAlertEmailAsync(string toEmail,
             string partName, int currentStock)
         {
@@ -229,7 +208,7 @@ namespace Autopartspro.Infrastructure.Services
             <html>
             <body style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;'>
                 <div style='padding: 30px; border: 1px solid #e0e0e0; border-radius: 8px;'>
-                    <h2 style='color: #e74c3c;'>⚠ Low Stock Alert</h2>
+                    <h2 style='color: #e74c3c;'>Low Stock Alert</h2>
                     <hr style='border: 1px solid #e0e0e0;' />
                     <p>The following part has dropped below the minimum stock level:</p>
                     <table style='width: 100%; border-collapse: collapse;'>
@@ -254,7 +233,6 @@ namespace Autopartspro.Infrastructure.Services
             await SendEmailAsync(toEmail, subject, body);
         }
 
-        // ── Credit Reminder Email ─────────────────────────────────
         public async Task SendCreditReminderEmailAsync(string toEmail,
             string fullName, decimal overdueAmount)
         {
