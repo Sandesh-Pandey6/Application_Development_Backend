@@ -11,7 +11,7 @@ namespace Autopartspro.Domain.Entities
         public bool DiscountApplied { get; set; } = false;
         public decimal DiscountAmount { get; set; } = 0;
         public decimal TotalAmount { get; set; }
-        public PaymentStatus PaymentStatus { get; set; } = PaymentStatus.Unpaid;
+        public Autopartspro.Domain.Enums.PaymentStatus PaymentStatus { get; set; } = Autopartspro.Domain.Enums.PaymentStatus.Unpaid;
         public DateTime SaleDate { get; set; }
 
         // Navigation Properties
