@@ -1,4 +1,4 @@
-﻿namespace Autopartspro.Application.DOTs.admin
+namespace Autopartspro.Application.DOTs.admin
 {
     public class CreateStaffDto
     {
@@ -21,6 +21,8 @@
         public string Department { get; set; } = string.Empty;
         public string AccessLevel { get; set; } = string.Empty;
         public string BranchLocation { get; set; } = string.Empty;
+        /// <summary>When true, approves staff for login. When false, revokes approval.</summary>
+        public bool? IsApprovedByAdmin { get; set; }
     }
 
     public class StaffResponseDto
@@ -44,6 +46,7 @@
     {
         public int TotalStaff { get; set; }
         public int ActiveStaff { get; set; }
+        public int PendingApproval { get; set; }
         public int Managers { get; set; }
         public int InactiveStaff { get; set; }
         public List<StaffResponseDto> Staff { get; set; } = new();

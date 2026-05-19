@@ -3,23 +3,22 @@ using System.ComponentModel.DataAnnotations;
 namespace Autopartspro.Application.Dtos;
 
 public record InvoiceItemDto(
-    Guid id,
+    Guid Id,
     Guid PartId,
     string? PartName,
     int Quantity,
     decimal UnitPrice,
-    decimal SubTotal
+    decimal Subtotal
 );
 
 public record InvoiceDto(
-    Guid id,
+    Guid Id,
     string InvoiceNumber,
     Guid CustomerId,
     string CustomerName,
-    Guid StaffId,
-    string StaffName,
-    DateTime SaleDate,
-    decimal SubTotal,
+    string? StaffName,
+    DateTime InvoiceDate,
+    decimal Subtotal,
     decimal DiscountAmount,
     decimal TotalAmount,
     string PaymentStatus,
@@ -28,23 +27,32 @@ public record InvoiceDto(
 
 public class InvoiceItemCreateDto
 {
+    [Required]
     public Guid PartId { get; set; }
-    
-    [Range(1, 1000)]
+
+    [Range(1, int.MaxValue)]
     public int Quantity { get; set; }
 }
 
 public class InvoiceCreateDto
 {
-    public Guid CustomerId { get; set; }
-    
-    public Guid? StaffId { get; set; }
-    
-    [Range(0, 100000)]
-    public decimal DiscountAmount { get; set; }
-    
     [Required]
+    public Guid CustomerId { get; set; }
+
+    public Guid? VehicleId { get; set; }
+
+    [MaxLength(150)]
+    public string? StaffName { get; set; }
+
+    [Range(0, 9999999.99)]
+    public decimal DiscountAmount { get; set; }
+
+    [MaxLength(500)]
+    public string? Notes { get; set; }
+
+    [MaxLength(20)]
     public string PaymentStatus { get; set; } = "Paid";
-    
+
+    [MinLength(1)]
     public List<InvoiceItemCreateDto> Items { get; set; } = new();
 }

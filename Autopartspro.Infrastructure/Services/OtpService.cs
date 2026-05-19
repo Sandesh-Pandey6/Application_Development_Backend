@@ -19,6 +19,8 @@ namespace Autopartspro.Infrastructure.Services
 
         public async Task<string> GenerateAndSendOtpAsync(string email, OtpPurpose purpose)
         {
+            email = email.Trim().ToLowerInvariant();
+
             // Invalidate all previous unused OTPs for this email + purpose
             var existingOtps = await _context.OtpVerifications
                 .Where(o => o.Email == email && o.Purpose == purpose && !o.IsUsed)
@@ -42,19 +44,29 @@ namespace Autopartspro.Infrastructure.Services
             _context.OtpVerifications.Add(otp);
             await _context.SaveChangesAsync();
 
-            // ⚠️ DEBUG LOG - So you can see the OTP in your terminal!
+            // Dev fallback: always log OTP (also sent by email when SMTP is configured)
             Console.WriteLine($"\n==========================================");
-            Console.WriteLine($"🔑 OTP FOR {email}: {otpCode}");
+            Console.WriteLine($"OTP FOR {email}: {otpCode} (purpose: {purpose})");
             Console.WriteLine($"==========================================\n");
 
-            // Send OTP email in the background to make the API super fast
-            _ = Task.Run(() => _emailService.SendOtpEmailAsync(email, otpCode, purpose.ToString()));
-
-            return "OTP sent successfully to " + email;
+            try
+            {
+                await _emailService.SendOtpEmailAsync(email, otpCode, purpose.ToString());
+                return $"Verification code sent to {email}. Please check your inbox (and spam folder).";
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Failed to send OTP email to {email}: {ex.Message}");
+                return
+                    "Your account was saved. We could not send the email — use the 6-digit code shown in the API console (Visual Studio Output), then enter it on the verification screen.";
+            }
         }
 
         public async Task<bool> VerifyOtpAsync(string email, string otpCode, OtpPurpose purpose)
         {
+            email = email.Trim().ToLowerInvariant();
+            otpCode = otpCode.Trim();
+
             var otp = await _context.OtpVerifications
                 .Where(o =>
                     o.Email == email &&

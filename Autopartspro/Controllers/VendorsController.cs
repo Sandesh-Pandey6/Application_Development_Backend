@@ -1,6 +1,7 @@
 using Autopartspro.Application.Dtos;
 using Autopartspro.Domain.Entities;
 using Autopartspro.Infrastructure.Data;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -8,6 +9,7 @@ namespace Autopartspro.Controllers;
 
 [ApiController]
 [Route("api/vendors")]
+[Authorize(Roles = "Admin,Staff")]
 public class VendorsController : ControllerBase
 {
     private readonly AppDbContext _db;
@@ -27,6 +29,7 @@ public class VendorsController : ControllerBase
                 (v.Email != null && v.Email.ToLower().Contains(s)) ||
                 (v.PhoneNumber != null && v.PhoneNumber.Contains(s)));
         }
+
         var items = await q.OrderBy(v => v.VendorName)
             .Select(v => new VendorDto(v.Id, v.VendorName, v.ContactPerson, v.Email, v.PhoneNumber, v.Address, v.CreatedAt, v.UpdatedAt))
             .ToListAsync();
@@ -47,17 +50,15 @@ public class VendorsController : ControllerBase
         var v = new Vendor
         {
             VendorName = dto.Name.Trim(),
-            ContactPerson = dto.ContactPerson?.Trim(),
-            Email = dto.Email?.Trim(),
-            PhoneNumber = dto.Phone?.Trim(),
-            Address = dto.Address?.Trim(),
-            CreatedAt = DateTime.UtcNow,
-            UpdatedAt = DateTime.UtcNow,
+            ContactPerson = dto.ContactPerson?.Trim() ?? string.Empty,
+            Email = dto.Email?.Trim() ?? string.Empty,
+            PhoneNumber = dto.Phone?.Trim() ?? string.Empty,
+            Address = dto.Address?.Trim() ?? string.Empty,
         };
         _db.Vendors.Add(v);
         await _db.SaveChangesAsync();
-        var result = new VendorDto(v.Id, v.VendorName, v.ContactPerson, v.Email, v.PhoneNumber, v.Address, v.CreatedAt, v.UpdatedAt);
-        return CreatedAtAction(nameof(Get), new { id = v.Id }, result);
+        return CreatedAtAction(nameof(Get), new { id = v.Id },
+            new VendorDto(v.Id, v.VendorName, v.ContactPerson, v.Email, v.PhoneNumber, v.Address, v.CreatedAt, v.UpdatedAt));
     }
 
     [HttpPut("{id:guid}")]
@@ -65,13 +66,15 @@ public class VendorsController : ControllerBase
     {
         var v = await _db.Vendors.FindAsync(id);
         if (v is null) return NotFound();
+
         v.VendorName = dto.Name.Trim();
-        v.ContactPerson = dto.ContactPerson?.Trim();
-        v.Email = dto.Email?.Trim();
-        v.PhoneNumber = dto.Phone?.Trim();
-        v.Address = dto.Address?.Trim();
+        v.ContactPerson = dto.ContactPerson?.Trim() ?? string.Empty;
+        v.Email = dto.Email?.Trim() ?? string.Empty;
+        v.PhoneNumber = dto.Phone?.Trim() ?? string.Empty;
+        v.Address = dto.Address?.Trim() ?? string.Empty;
         v.UpdatedAt = DateTime.UtcNow;
         await _db.SaveChangesAsync();
+
         return new VendorDto(v.Id, v.VendorName, v.ContactPerson, v.Email, v.PhoneNumber, v.Address, v.CreatedAt, v.UpdatedAt);
     }
 
@@ -83,9 +86,7 @@ public class VendorsController : ControllerBase
 
         var hasParts = await _db.Parts.AnyAsync(p => p.VendorId == id);
         if (hasParts)
-        {
             return Conflict(new { message = "Vendor has parts associated. Reassign or delete those parts first." });
-        }
 
         _db.Vendors.Remove(v);
         await _db.SaveChangesAsync();

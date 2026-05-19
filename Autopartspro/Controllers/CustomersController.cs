@@ -2,6 +2,7 @@ using Autopartspro.Application.Dtos;
 using Autopartspro.Domain.Entities;
 using Autopartspro.Domain.Enums;
 using Autopartspro.Infrastructure.Data;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -9,22 +10,26 @@ namespace Autopartspro.Controllers;
 
 [ApiController]
 [Route("api/customers")]
+[Authorize(Roles = "Admin,Staff")]
 public class CustomersController : ControllerBase
 {
     private readonly AppDbContext _db;
 
     public CustomersController(AppDbContext db) => _db = db;
 
+    private IQueryable<User> CustomersQuery() =>
+        _db.Users.AsNoTracking().Where(u => u.Role == RoleType.Customer);
+
     [HttpGet]
     public async Task<ActionResult<IEnumerable<CustomerListItemDto>>> List(
         [FromQuery] string? search,
-        [FromQuery] string? numberPlate)
+        [FromQuery] string? vehicleNumber)
     {
-        var q = _db.Users.AsNoTracking().Where(u => u.Role == RoleType.Customer).AsQueryable();
+        var q = CustomersQuery().Include(c => c.Vehicles).AsQueryable();
 
-        if (!string.IsNullOrWhiteSpace(numberPlate))
+        if (!string.IsNullOrWhiteSpace(vehicleNumber))
         {
-            var vn = numberPlate.Trim().ToLower();
+            var vn = vehicleNumber.Trim().ToLower();
             q = q.Where(c => c.Vehicles.Any(v => v.NumberPlate.ToLower().Contains(vn)));
         }
 
@@ -34,8 +39,9 @@ public class CustomersController : ControllerBase
             q = q.Where(c =>
                 c.FullName.ToLower().Contains(s) ||
                 c.PhoneNumber.Contains(s) ||
-                (c.Email != null && c.Email.ToLower().Contains(s)) ||
-                (c.City != null && c.City.ToLower().Contains(s)));
+                c.Email.ToLower().Contains(s) ||
+                c.City.ToLower().Contains(s) ||
+                c.Id.ToString().Contains(s));
         }
 
         var items = await q.OrderByDescending(c => c.CreatedAt)
@@ -49,9 +55,9 @@ public class CustomersController : ControllerBase
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<CustomerDetailDto>> Get(Guid id)
     {
-        var c = await _db.Users.AsNoTracking()
+        var c = await CustomersQuery()
             .Include(c => c.Vehicles)
-            .FirstOrDefaultAsync(c => c.Id == id && c.Role == RoleType.Customer);
+            .FirstOrDefaultAsync(c => c.Id == id);
         if (c is null) return NotFound();
         return ToDetail(c);
     }
@@ -59,9 +65,9 @@ public class CustomersController : ControllerBase
     [HttpGet("{id:guid}/history")]
     public async Task<ActionResult<CustomerHistoryDto>> History(Guid id)
     {
-        var c = await _db.Users.AsNoTracking()
+        var c = await CustomersQuery()
             .Include(c => c.Vehicles)
-            .FirstOrDefaultAsync(c => c.Id == id && c.Role == RoleType.Customer);
+            .FirstOrDefaultAsync(c => c.Id == id);
         if (c is null) return NotFound();
 
         var invoices = await _db.SalesInvoices.AsNoTracking()
@@ -76,8 +82,7 @@ public class CustomersController : ControllerBase
             s.SaleDate,
             s.TotalAmount,
             s.PaymentStatus.ToString(),
-            s.Items.Count,
-            null)).ToList();
+            s.Items.Count)).ToList();
 
         var totalSpent = invoices.Sum(s => s.TotalAmount);
 
@@ -90,33 +95,31 @@ public class CustomersController : ControllerBase
         var customer = new User
         {
             FullName = dto.FullName.Trim(),
-            PhoneNumber = dto.PhoneNumber.Trim(),
-            Email = dto.Email?.Trim() ?? "",
-            City = dto.City?.Trim() ?? "",
+            PhoneNumber = dto.Phone.Trim(),
+            Email = dto.Email?.Trim().ToLowerInvariant() ?? $"{Guid.NewGuid():N}@customer.local",
+            City = dto.City?.Trim() ?? string.Empty,
             Role = RoleType.Customer,
-            CreatedAt = DateTime.UtcNow,
+            Status = StatusType.Active,
+            IsEmailVerified = true,
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword(Guid.NewGuid().ToString("N")),
         };
 
         foreach (var vDto in dto.Vehicles)
         {
-            var trimmed = vDto.NumberPlate.Trim().ToUpper();
-            var exists = await _db.Vehicles.AnyAsync(v => v.NumberPlate == trimmed);
-            if (exists)
-            {
+            var trimmed = vDto.NumberPlate.Trim();
+            if (await _db.Vehicles.AnyAsync(v => v.NumberPlate.ToLower() == trimmed.ToLower()))
                 return Conflict(new { message = $"Vehicle number '{trimmed}' is already registered." });
-            }
-            FuelType parsedFuelType = FuelType.Petrol;
-            if (vDto.FuelType != null) {
-                Enum.TryParse<FuelType>(vDto.FuelType, true, out parsedFuelType);
-            }
+
+            var fuelType = Enum.TryParse<FuelType>(vDto.FuelType, true, out var ft)
+                ? ft : FuelType.Petrol;
+
             customer.Vehicles.Add(new Vehicle
             {
                 NumberPlate = trimmed,
-                Make = vDto.Make?.Trim() ?? "",
-                Model = vDto.Model?.Trim() ?? "",
-                Year = vDto.Year ?? DateTime.UtcNow.Year,
-                FuelType = parsedFuelType,
-                CreatedAt = DateTime.UtcNow,
+                Make = vDto.Make?.Trim() ?? string.Empty,
+                Model = vDto.Model?.Trim() ?? string.Empty,
+                Year = vDto.Year ?? 0,
+                FuelType = fuelType,
             });
         }
 
@@ -129,13 +132,15 @@ public class CustomersController : ControllerBase
     [HttpPut("{id:guid}")]
     public async Task<ActionResult<CustomerDetailDto>> Update(Guid id, [FromBody] CustomerUpdateDto dto)
     {
-        var c = await _db.Users.Include(c => c.Vehicles).FirstOrDefaultAsync(c => c.Id == id && c.Role == RoleType.Customer);
+        var c = await _db.Users.Include(c => c.Vehicles)
+            .FirstOrDefaultAsync(c => c.Id == id && c.Role == RoleType.Customer);
         if (c is null) return NotFound();
 
         c.FullName = dto.FullName.Trim();
-        c.PhoneNumber = dto.PhoneNumber.Trim();
-        if (dto.Email != null) c.Email = dto.Email.Trim();
-        if (dto.City != null) c.City = dto.City.Trim();
+        c.PhoneNumber = dto.Phone.Trim();
+        c.Email = dto.Email?.Trim().ToLowerInvariant() ?? c.Email;
+        c.City = dto.City?.Trim() ?? string.Empty;
+        c.UpdatedAt = DateTime.UtcNow;
         await _db.SaveChangesAsync();
 
         return ToDetail(c);
@@ -144,14 +149,11 @@ public class CustomersController : ControllerBase
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Delete(Guid id)
     {
-        var c = await _db.Users.FindAsync(id);
-        if (c is null || c.Role != RoleType.Customer) return NotFound();
+        var c = await _db.Users.FirstOrDefaultAsync(u => u.Id == id && u.Role == RoleType.Customer);
+        if (c is null) return NotFound();
 
-        var hasInvoices = await _db.SalesInvoices.AnyAsync(s => s.CustomerId == id);
-        if (hasInvoices)
-        {
+        if (await _db.SalesInvoices.AnyAsync(s => s.CustomerId == id))
             return Conflict(new { message = "Customer has sales invoices and cannot be deleted." });
-        }
 
         _db.Users.Remove(c);
         await _db.SaveChangesAsync();
@@ -164,32 +166,27 @@ public class CustomersController : ControllerBase
         var c = await _db.Users.FirstOrDefaultAsync(u => u.Id == id && u.Role == RoleType.Customer);
         if (c is null) return NotFound();
 
-        var trimmed = dto.NumberPlate.Trim().ToUpper();
-        if (await _db.Vehicles.AnyAsync(v => v.NumberPlate == trimmed))
-        {
+        var trimmed = dto.NumberPlate.Trim();
+        if (await _db.Vehicles.AnyAsync(v => v.NumberPlate.ToLower() == trimmed.ToLower()))
             return Conflict(new { message = $"Vehicle number '{trimmed}' is already registered." });
-        }
 
-        FuelType parsedFuelType = FuelType.Petrol;
-        if (dto.FuelType != null) {
-            Enum.TryParse<FuelType>(dto.FuelType, true, out parsedFuelType);
-        }
+        var fuelType = Enum.TryParse<FuelType>(dto.FuelType, true, out var ft)
+            ? ft : FuelType.Petrol;
 
         var v = new Vehicle
         {
             CustomerId = id,
             NumberPlate = trimmed,
-            Make = dto.Make?.Trim() ?? "",
-            Model = dto.Model?.Trim() ?? "",
-            Year = dto.Year ?? DateTime.UtcNow.Year,
-            FuelType = parsedFuelType,
-            CreatedAt = DateTime.UtcNow,
+            Make = dto.Make?.Trim() ?? string.Empty,
+            Model = dto.Model?.Trim() ?? string.Empty,
+            Year = dto.Year ?? 0,
+            FuelType = fuelType,
         };
         _db.Vehicles.Add(v);
         await _db.SaveChangesAsync();
 
-        return CreatedAtAction(nameof(Get), new { id }, new VehicleDto(
-            v.Id, v.CustomerId, v.NumberPlate, v.Make, v.Model, v.Year, v.FuelType.ToString()));
+        return CreatedAtAction(nameof(Get), new { id },
+            new VehicleDto(v.Id, v.CustomerId, v.NumberPlate, v.Make, v.Model, v.Year, v.FuelType.ToString()));
     }
 
     [HttpDelete("{id:guid}/vehicles/{vehicleId:guid}")]
@@ -203,7 +200,12 @@ public class CustomersController : ControllerBase
     }
 
     private static CustomerDetailDto ToDetail(User c) => new(
-        c.Id, c.FullName, c.PhoneNumber, c.Email, c.City, c.CreatedAt,
+        c.Id,
+        c.FullName,
+        c.PhoneNumber,
+        c.Email,
+        c.City,
+        c.CreatedAt,
         c.Vehicles.Select(v => new VehicleDto(
             v.Id, v.CustomerId, v.NumberPlate, v.Make, v.Model, v.Year, v.FuelType.ToString())).ToList());
 }

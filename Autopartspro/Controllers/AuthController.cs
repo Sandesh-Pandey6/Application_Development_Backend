@@ -2,6 +2,7 @@ using Autopartspro.Application.DOTs.auth;
 using Autopartspro.Application.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 
 namespace Autopartspro.Controllers
@@ -21,8 +22,22 @@ namespace Autopartspro.Controllers
         [HttpPost("register")]
         public async Task<IActionResult> Register([FromBody] RegisterDto dto)
         {
-            var message = await _authService.RegisterAsync(dto);
-            return Ok(new { message });
+            if (string.IsNullOrWhiteSpace(dto.FullName) ||
+                string.IsNullOrWhiteSpace(dto.Email) ||
+                string.IsNullOrWhiteSpace(dto.Password))
+            {
+                return BadRequest(new { message = "Full name, email, and password are required." });
+            }
+
+            try
+            {
+                var message = await _authService.RegisterAsync(dto);
+                return Ok(new { message });
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
         }
 
         // POST api/auth/verify-email
@@ -37,8 +52,18 @@ namespace Autopartspro.Controllers
         [HttpPost("login")]
         public async Task<IActionResult> Login([FromBody] LoginDto dto)
         {
-            var message = await _authService.LoginAsync(dto);
-            return Ok(new { message });
+            if (string.IsNullOrWhiteSpace(dto.Email) || string.IsNullOrWhiteSpace(dto.Password))
+                return BadRequest(new { message = "Email and password are required." });
+
+            try
+            {
+                var result = await _authService.LoginAsync(dto);
+                return Ok(result);
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
         }
 
         // POST api/auth/verify-login
@@ -79,7 +104,10 @@ namespace Autopartspro.Controllers
         public async Task<IActionResult> GetCurrentUser()
         {
             var email = User.FindFirstValue(ClaimTypes.Email)
-                ?? throw new Exception("Unauthorized.");
+                ?? User.FindFirstValue(JwtRegisteredClaimNames.Email)
+                ?? User.FindFirstValue("email");
+            if (string.IsNullOrWhiteSpace(email))
+                return Unauthorized(new { message = "Invalid or expired session. Please sign in again." });
             var result = await _authService.GetCurrentUserAsync(email);
             return Ok(result);
         }

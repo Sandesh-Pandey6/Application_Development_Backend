@@ -1,4 +1,4 @@
-﻿namespace Autopartspro.Application.DOTs.admin
+namespace Autopartspro.Application.DOTs.admin
 {
     public class CreatePartDto
     {
@@ -40,10 +40,14 @@
 
     public class PartListResponseDto
     {
+        /// <summary>Sum of stock quantities across all parts.</summary>
         public int TotalParts { get; set; }
+        /// <summary>Number of distinct part records (for pagination).</summary>
+        public int TotalCount { get; set; }
         public int TotalCategories { get; set; }
         public int LowStockCount { get; set; }
         public int TotalVendors { get; set; }
+        public List<string> Categories { get; set; } = new();
         public List<PartResponseDto> Parts { get; set; } = new();
         public int CurrentPage { get; set; }
         public int TotalPages { get; set; }

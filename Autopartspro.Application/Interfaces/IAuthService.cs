@@ -1,4 +1,4 @@
-﻿using Autopartspro.Application.DOTs.auth;
+using Autopartspro.Application.DOTs.auth;
 
 namespace Autopartspro.Application.Interfaces
 {
@@ -6,7 +6,7 @@ namespace Autopartspro.Application.Interfaces
     {
         Task<string> RegisterAsync(RegisterDto dto);
         Task<AuthResponseDto> VerifyEmailOtpAsync(VerifyOtpDto dto);
-        Task<string> LoginAsync(LoginDto dto);
+        Task<AuthResponseDto> LoginAsync(LoginDto dto);
         Task<AuthResponseDto> VerifyLoginOtpAsync(VerifyOtpDto dto);
         Task<string> ResendOtpAsync(ResendOtpDto dto);
         Task<string> ForgotPasswordAsync(ForgotPasswordDto dto);

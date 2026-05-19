@@ -1,15 +1,16 @@
 using System.ComponentModel.DataAnnotations;
+using Autopartspro.Domain.Enums;
 
 namespace Autopartspro.Application.Dtos;
 
 public record VehicleDto(
-    Guid id,
-    Guid customerId,
+    Guid Id,
+    Guid CustomerId,
     string NumberPlate,
-    string? Make,
-    string? Model,
-    int? Year,
-    string? FuelType
+    string Make,
+    string Model,
+    int Year,
+    string FuelType
 );
 
 public class VehicleUpsertDto
@@ -25,23 +26,22 @@ public class VehicleUpsertDto
 
     public int? Year { get; set; }
 
-    [MaxLength(40)]
     public string? FuelType { get; set; }
 }
 
 public record CustomerListItemDto(
-    Guid id,
+    Guid Id,
     string FullName,
-    string PhoneNumber,
+    string Phone,
     string? Email,
     int VehicleCount,
     DateTime CreatedAt
 );
 
 public record CustomerDetailDto(
-    Guid id,
+    Guid Id,
     string FullName,
-    string PhoneNumber,
+    string Phone,
     string? Email,
     string? City,
     DateTime CreatedAt,
@@ -54,12 +54,12 @@ public class CustomerCreateDto
     public string FullName { get; set; } = string.Empty;
 
     [Required, MaxLength(30)]
-    public string PhoneNumber { get; set; } = string.Empty;
+    public string Phone { get; set; } = string.Empty;
 
     [MaxLength(150), EmailAddress]
     public string? Email { get; set; }
 
-    [MaxLength(300)]
+    [MaxLength(100)]
     public string? City { get; set; }
 
     public List<VehicleUpsertDto> Vehicles { get; set; } = new();
@@ -71,23 +71,22 @@ public class CustomerUpdateDto
     public string FullName { get; set; } = string.Empty;
 
     [Required, MaxLength(30)]
-    public string PhoneNumber { get; set; } = string.Empty;
+    public string Phone { get; set; } = string.Empty;
 
     [MaxLength(150), EmailAddress]
     public string? Email { get; set; }
 
-    [MaxLength(300)]
+    [MaxLength(100)]
     public string? City { get; set; }
 }
 
 public record InvoiceSummaryDto(
-    Guid id,
+    Guid Id,
     string InvoiceNumber,
-    DateTime SaleDate,
+    DateTime InvoiceDate,
     decimal TotalAmount,
     string PaymentStatus,
-    int ItemCount,
-    string? NumberPlate
+    int ItemCount
 );
 
 public record CustomerHistoryDto(

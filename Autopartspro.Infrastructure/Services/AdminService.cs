@@ -1,4 +1,4 @@
-﻿using Autopartspro.Application.DOTs.admin;
+using Autopartspro.Application.DOTs.admin;
 using Autopartspro.Application.Interfaces;
 using Autopartspro.Domain.Entities;
 using Autopartspro.Domain.Enums;
@@ -25,7 +25,7 @@ namespace Autopartspro.Infrastructure.Services
         public async Task<DashboardDto> GetDashboardAsync()
         {
             var now = DateTime.UtcNow;
-            var startOfMonth = new DateTime(now.Year, now.Month, 1);
+            var startOfMonth = UtcDate.StartOfMonth(now);
             var startOfLastMonth = startOfMonth.AddMonths(-1);
 
             // Revenue MTD
@@ -61,7 +61,7 @@ namespace Autopartspro.Infrastructure.Services
             var revenueOverview = new List<MonthlyRevenueDto>();
             for (int i = 6; i >= 0; i--)
             {
-                var monthStart = new DateTime(now.Year, now.Month, 1).AddMonths(-i);
+                var monthStart = UtcDate.StartOfMonth(now).AddMonths(-i);
                 var monthEnd = monthStart.AddMonths(1);
                 var revenue = await _context.SalesInvoices
                     .Where(s => s.SaleDate >= monthStart && s.SaleDate < monthEnd)
@@ -91,15 +91,35 @@ namespace Autopartspro.Infrastructure.Services
                 })
                 .ToListAsync();
 
+            var recentSales = await _context.SalesInvoices
+                .Include(s => s.Staff)
+                .Include(s => s.Customer)
+                .OrderByDescending(s => s.SaleDate)
+                .Take(5)
+                .ToListAsync();
+
+            var recentActivities = recentSales.Select(s => new RecentActivityDto
+            {
+                StaffName = s.Staff?.FullName ?? "Staff",
+                Action = "completed a sale for",
+                Target = s.Customer?.FullName ?? "customer",
+                TimeAgo = FormatTimeAgo(s.SaleDate),
+                Type = "invoice"
+            }).ToList();
+
             return new DashboardDto
             {
                 TotalRevenueMTD = revenueMTD,
                 RevenueChangePercent = revenueChange,
                 TotalPartsInStock = totalParts,
+                PartsChangePercent = 0,
                 ActiveStaff = activeStaff,
+                StaffChangePercent = 0,
                 PendingOrders = pendingOrders,
+                PendingOrdersChangePercent = 0,
                 LowStockCount = lowStockCount,
                 RevenueOverview = revenueOverview,
+                RecentActivities = recentActivities,
                 RecentPurchaseInvoices = recentInvoices
             };
         }
@@ -135,7 +155,7 @@ namespace Autopartspro.Infrastructure.Services
                 Department = u.StaffEmployment?.Department.ToString() ?? "",
                 AccessLevel = u.StaffEmployment?.AccessLevel.ToString() ?? "Staff",
                 BranchLocation = u.StaffEmployment?.BranchLocation ?? "",
-                Status = u.Status.ToString(),
+                Status = MapStaffDisplayStatus(u),
                 IsApprovedByAdmin = u.StaffEmployment?.IsApprovedByAdmin ?? false,
                 CreatedAt = u.CreatedAt
             }).ToList();
@@ -144,6 +164,7 @@ namespace Autopartspro.Infrastructure.Services
             {
                 TotalStaff = staffDtos.Count,
                 ActiveStaff = staffDtos.Count(s => s.Status == "Active"),
+                PendingApproval = staffDtos.Count(s => s.Status == "Pending Approval"),
                 Managers = staffDtos.Count(s => s.AccessLevel == "Manager"),
                 InactiveStaff = staffDtos.Count(s => s.Status == "Inactive"),
                 Staff = staffDtos
@@ -169,10 +190,19 @@ namespace Autopartspro.Infrastructure.Services
                 Department = user.StaffEmployment?.Department.ToString() ?? "",
                 AccessLevel = user.StaffEmployment?.AccessLevel.ToString() ?? "Staff",
                 BranchLocation = user.StaffEmployment?.BranchLocation ?? "",
-                Status = user.Status.ToString(),
+                Status = MapStaffDisplayStatus(user),
                 IsApprovedByAdmin = user.StaffEmployment?.IsApprovedByAdmin ?? false,
                 CreatedAt = user.CreatedAt
             };
+        }
+
+        private static string MapStaffDisplayStatus(User u)
+        {
+            if (u.Status == StatusType.Inactive)
+                return "Inactive";
+            if (u.StaffEmployment != null && !u.StaffEmployment.IsApprovedByAdmin)
+                return "Pending Approval";
+            return "Active";
         }
 
         public async Task<StaffResponseDto> CreateStaffAsync(CreateStaffDto dto)
@@ -251,6 +281,17 @@ namespace Autopartspro.Infrastructure.Services
                 user.StaffEmployment.AccessLevel = Enum.TryParse<AccessLevel>(
                     dto.AccessLevel, out var al) ? al : user.StaffEmployment.AccessLevel;
                 user.StaffEmployment.BranchLocation = dto.BranchLocation;
+
+                if (dto.IsApprovedByAdmin.HasValue)
+                {
+                    var wasApproved = user.StaffEmployment.IsApprovedByAdmin;
+                    user.StaffEmployment.IsApprovedByAdmin = dto.IsApprovedByAdmin.Value;
+                    if (dto.IsApprovedByAdmin.Value && !wasApproved)
+                    {
+                        await _emailService.SendStaffApprovalEmailAsync(user.Email, user.FullName);
+                    }
+                }
+
                 user.StaffEmployment.UpdatedAt = DateTime.UtcNow;
             }
 
@@ -350,14 +391,22 @@ namespace Autopartspro.Infrastructure.Services
                 UpdatedAt = p.UpdatedAt
             }).ToList();
 
+            var categories = await _context.Parts
+                .Select(p => p.Category)
+                .Where(c => c != null && c != "")
+                .Distinct()
+                .OrderBy(c => c)
+                .ToListAsync();
+
             return new PartListResponseDto
             {
                 TotalParts = await _context.Parts.SumAsync(p => p.StockQuantity),
-                TotalCategories = await _context.Parts
-                    .Select(p => p.Category).Distinct().CountAsync(),
+                TotalCount = totalCount,
+                TotalCategories = categories.Count,
                 LowStockCount = await _context.Parts
                     .CountAsync(p => p.StockQuantity < LowStockThreshold),
                 TotalVendors = await _context.Vendors.CountAsync(),
+                Categories = categories,
                 Parts = partDtos,
                 CurrentPage = page,
                 TotalPages = totalPages
@@ -574,25 +623,25 @@ namespace Autopartspro.Infrastructure.Services
         public async Task<FinancialReportDto> GetFinancialReportAsync(
             string period, DateTime? date)
         {
-            var now = date ?? DateTime.UtcNow;
+            var now = UtcDate.EnsureUtc(date ?? DateTime.UtcNow);
             DateTime startDate, endDate, prevStart, prevEnd;
 
             switch (period.ToLower())
             {
                 case "daily":
-                    startDate = now.Date;
+                    startDate = UtcDate.StartOfDay(now);
                     endDate = startDate.AddDays(1);
                     prevStart = startDate.AddDays(-1);
                     prevEnd = startDate;
                     break;
                 case "yearly":
-                    startDate = new DateTime(now.Year, 1, 1);
+                    startDate = UtcDate.StartOfYear(now);
                     endDate = startDate.AddYears(1);
                     prevStart = startDate.AddYears(-1);
                     prevEnd = startDate;
                     break;
                 default: // monthly
-                    startDate = new DateTime(now.Year, now.Month, 1);
+                    startDate = UtcDate.StartOfMonth(now);
                     endDate = startDate.AddMonths(1);
                     prevStart = startDate.AddMonths(-1);
                     prevEnd = startDate;
@@ -627,17 +676,27 @@ namespace Autopartspro.Infrastructure.Services
             var netMargin = grossRevenue > 0
                 ? Math.Round((grossRevenue - totalExpenses) / grossRevenue * 100, 1) : 0;
 
-            // Revenue over time
-            var salesOverTime = await _context.SalesInvoices
+            var prevNetMargin = prevRevenue > 0
+                ? Math.Round((prevRevenue - prevExpenses) / prevRevenue * 100, 1) : 0;
+
+            var netMarginChange = prevNetMargin > 0
+                ? Math.Round(netMargin - prevNetMargin, 1) : 0;
+
+            // Revenue over time (format dates in memory — EF cannot translate ToString("dd MMM"))
+            var salesInPeriod = await _context.SalesInvoices
                 .Where(s => s.SaleDate >= startDate && s.SaleDate < endDate)
-                .GroupBy(s => s.SaleDate.Date)
+                .Select(s => new { s.SaleDate, s.TotalAmount })
+                .ToListAsync();
+
+            var salesOverTime = salesInPeriod
+                .GroupBy(s => DateOnly.FromDateTime(s.SaleDate))
+                .OrderBy(g => g.Key)
                 .Select(g => new RevenueOverTimeDto
                 {
                     Label = g.Key.ToString("dd MMM"),
-                    Revenue = g.Sum(s => s.TotalAmount)
+                    Revenue = g.Sum(x => x.TotalAmount)
                 })
-                .OrderBy(r => r.Label)
-                .ToListAsync();
+                .ToList();
 
             // Purchase costs by category
             var costsByCategory = await _context.PurchaseInvoiceItems
@@ -699,6 +758,7 @@ namespace Autopartspro.Infrastructure.Services
                 TotalExpenses = totalExpenses,
                 ExpensesChangePercent = expensesChange,
                 NetMargin = netMargin,
+                NetMarginChangePercent = netMarginChange,
                 SalesRevenueOverTime = salesOverTime,
                 PurchaseCostsByCategory = costsByCategory,
                 TopSellingParts = topParts,
@@ -772,8 +832,9 @@ namespace Autopartspro.Infrastructure.Services
 
             if (!string.IsNullOrEmpty(type) && type != "All")
             {
-                if (Enum.TryParse<NotificationType>(type, out var notifType))
-                    query = query.Where(n => n.Type == notifType);
+                var notifType = MapNotificationFilterType(type);
+                if (notifType.HasValue)
+                    query = query.Where(n => n.Type == notifType.Value);
             }
 
             var notifications = await query
@@ -795,7 +856,7 @@ namespace Autopartspro.Infrastructure.Services
                     Id = n.Id,
                     Title = GetNotificationTitle(n),
                     Message = n.Message,
-                    Type = n.Type.ToString(),
+                    Type = MapNotificationDisplayType(n.Type),
                     IsRead = n.IsRead,
                     CreatedAt = n.CreatedAt
                 }).ToList()
@@ -846,10 +907,37 @@ namespace Autopartspro.Infrastructure.Services
 
         private static string GetNotificationTitle(Notification n) => n.Type switch
         {
-            NotificationType.LowStock => $"Low Stock Alert: {n.Message.Split(' ')[0]} {n.Message.Split(' ')[1]}",
-            NotificationType.CreditReminder => "Overdue Credit Balance",
-            NotificationType.General => "Info",
+            NotificationType.LowStock => $"Low Stock Alert",
+            NotificationType.CreditReminder => "Credit Reminder",
+            NotificationType.General => "System Info",
             _ => "Notification"
         };
+
+        private static string MapNotificationDisplayType(NotificationType type) => type switch
+        {
+            NotificationType.LowStock => "Low Stock",
+            NotificationType.CreditReminder => "Credit Reminder",
+            NotificationType.General => "Info",
+            _ => "Info"
+        };
+
+        private static NotificationType? MapNotificationFilterType(string type) => type switch
+        {
+            "Low Stock" => NotificationType.LowStock,
+            "Credit Reminder" => NotificationType.CreditReminder,
+            "Info" => NotificationType.General,
+            _ when Enum.TryParse<NotificationType>(type, true, out var parsed) => parsed,
+            _ => null
+        };
+
+        private static string FormatTimeAgo(DateTime utc)
+        {
+            var span = DateTime.UtcNow - utc;
+            if (span.TotalMinutes < 1) return "just now";
+            if (span.TotalHours < 1) return $"{(int)span.TotalMinutes}m ago";
+            if (span.TotalDays < 1) return $"{(int)span.TotalHours}h ago";
+            if (span.TotalDays < 30) return $"{(int)span.TotalDays}d ago";
+            return utc.ToString("dd MMM yyyy");
+        }
     }
 }

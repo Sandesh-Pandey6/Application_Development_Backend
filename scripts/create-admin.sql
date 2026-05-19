@@ -1,0 +1,12 @@
+-- Manual admin creation (only if you cannot use Development bootstrap on API startup).
+-- Prefer: restart the API in Development — it auto-creates admin from appsettings.Development.json
+--
+-- Default dev credentials:
+--   Email:    admin@autopartspro.com
+--   Password: Admin@123
+--
+-- Generate a BCrypt hash in the API project, then insert:
+-- DELETE FROM "Users" WHERE "Email" = 'admin@autopartspro.com';
+-- INSERT INTO "Users" ("Id", "FullName", "Email", "PasswordHash", "PhoneNumber", "City", "Role", "Status", "IsEmailVerified", "CreatedAt", "UpdatedAt")
+-- VALUES (gen_random_uuid(), 'System Administrator', 'admin@autopartspro.com', '<bcrypt-hash-here>', '', 'Kathmandu', 0, 0, true, NOW(), NOW());
+-- Role 0 = Admin, Status 0 = Active (verify enum ordinals in your schema).

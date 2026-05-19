@@ -66,7 +66,7 @@ namespace Autopartspro.Infrastructure.Services
         {
             var customersWithPending = await _context.Users
                 .Include(u => u.CustomerInvoices)
-                .Where(u => u.Role == RoleType.Customer && u.CustomerInvoices.Any(i => i.PaymentStatus == PaymentStatus.Unpaid || i.PaymentStatus == PaymentStatus.Overdue))
+                .Where(u => u.Role == RoleType.Customer && u.CustomerInvoices.Any(i => i.PaymentStatus == PaymentStatus.Unpaid))
                 .ToListAsync();
 
             var results = new List<PendingCreditReportDto>();
@@ -74,7 +74,7 @@ namespace Autopartspro.Infrastructure.Services
             foreach (var c in customersWithPending)
             {
                 var pendingInvoices = c.CustomerInvoices
-                    .Where(i => i.PaymentStatus == PaymentStatus.Unpaid || i.PaymentStatus == PaymentStatus.Overdue)
+                    .Where(i => i.PaymentStatus == PaymentStatus.Unpaid)
                     .ToList();
 
                 var dto = new PendingCreditReportDto

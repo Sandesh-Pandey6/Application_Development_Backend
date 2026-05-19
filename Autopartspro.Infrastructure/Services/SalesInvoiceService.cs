@@ -1,7 +1,7 @@
 using Autopartspro.Application.Interfaces;
+using Autopartspro.Domain.Enums;
 using Autopartspro.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
-using System.Text;
 
 namespace Autopartspro.Infrastructure.Services
 {
@@ -18,18 +18,55 @@ namespace Autopartspro.Infrastructure.Services
 
         public async Task<bool> SendInvoiceEmailAsync(Guid invoiceId)
         {
+            var invoice = await LoadInvoiceForPdfAsync(invoiceId);
+
+            if (string.IsNullOrWhiteSpace(invoice.Customer.Email) ||
+                invoice.Customer.Email.EndsWith("@customer.local", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException(
+                    "This customer has no valid email on file. Add an email to their profile before sending the invoice.");
+            }
+
+            var pdfBytes = InvoicePdfGenerator.Build(invoice);
+            await _emailService.SendInvoiceEmailAsync(
+                invoice.Customer.Email,
+                invoice.Customer.FullName,
+                invoice.InvoiceNumber,
+                pdfBytes);
+            return true;
+        }
+
+        public async Task<byte[]> GetInvoicePdfBytesAsync(Guid invoiceId)
+        {
+            var invoice = await LoadInvoiceForPdfAsync(invoiceId);
+            return InvoicePdfGenerator.Build(invoice);
+        }
+
+        public async Task<byte[]> GetPaidInvoicePdfAsync(Guid invoiceId)
+        {
+            var invoice = await LoadInvoiceForPdfAsync(invoiceId);
+            if (invoice.PaymentStatus != PaymentStatus.Paid)
+            {
+                throw new InvalidOperationException(
+                    "PDF download and print are only available for paid invoices.");
+            }
+
+            return InvoicePdfGenerator.Build(invoice);
+        }
+
+        private async Task<Domain.Entities.SalesInvoice> LoadInvoiceForPdfAsync(Guid invoiceId)
+        {
             var invoice = await _context.SalesInvoices
                 .Include(i => i.Customer)
+                .Include(i => i.Staff)
+                .Include(i => i.Items)
+                .ThenInclude(x => x.Part)
                 .FirstOrDefaultAsync(i => i.Id == invoiceId);
 
-            if (invoice == null) throw new KeyNotFoundException("Invoice not found.");
+            if (invoice == null)
+                throw new KeyNotFoundException("Invoice not found.");
 
-            // Basic text-based PDF fallback for now (to satisfy byte[])
-            var dummyContent = $"Invoice Number: {invoice.InvoiceNumber}\nAmount: {invoice.TotalAmount}\nStatus: {invoice.PaymentStatus}";
-            var dummyPdfBytes = Encoding.UTF8.GetBytes(dummyContent);
-
-            await _emailService.SendInvoiceEmailAsync(invoice.Customer.Email, invoice.Customer.FullName, invoice.InvoiceNumber, dummyPdfBytes);
-            return true;
+            return invoice;
         }
     }
 }

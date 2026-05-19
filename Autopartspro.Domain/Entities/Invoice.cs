@@ -7,7 +7,7 @@ public class Invoice
     public decimal OriginalAmount { get; set; }
     public decimal DiscountAmount { get; set; } = 0;
     public decimal FinalAmount { get; set; }
-    public string PaymentStatus { get; set; } = "Pending"; // Pending, Paid, Overdue
+    public string PaymentStatus { get; set; } = "Pending"; // Pending, Paid, Unpaid
     public string InvoiceNumber { get; set; } = string.Empty;
     public DateTime InvoiceDate { get; set; } = DateTime.UtcNow;
     public DateTime? DueDate { get; set; }

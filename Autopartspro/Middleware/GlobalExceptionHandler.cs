@@ -1,4 +1,4 @@
-﻿using System.Net;
+using System.Net;
 using System.Text.Json;
 
 namespace Autopartspro.API.Middleware;
@@ -32,7 +32,7 @@ public class GlobalExceptionHandler : IMiddleware
         var (statusCode, message) = ex switch
         {
             ArgumentException => (HttpStatusCode.BadRequest, ex.Message),
-            InvalidOperationException => (HttpStatusCode.Conflict, ex.Message),
+            InvalidOperationException => (HttpStatusCode.BadRequest, ex.Message),
             UnauthorizedAccessException => (HttpStatusCode.Unauthorized, ex.Message),
             KeyNotFoundException => (HttpStatusCode.NotFound, ex.Message),
             _ => (HttpStatusCode.InternalServerError, "An unexpected error occurred.")
