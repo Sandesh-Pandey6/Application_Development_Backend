@@ -1,4 +1,4 @@
-using Autopartspro.Application.DOTs.admin;
+using Autopartspro.Application.Dtos.Admin;
 using Autopartspro.Application.Interfaces;
 using Autopartspro.Domain.Entities;
 using Autopartspro.Domain.Enums;
@@ -11,12 +11,20 @@ namespace Autopartspro.Infrastructure.Services
     {
         private readonly AppDbContext _context;
         private readonly IEmailService _emailService;
+        private readonly IPurchaseInvoiceService _purchaseInvoices;
+        private readonly IUserNotificationService _notifications;
         private const int LowStockThreshold = 10;
 
-        public AdminService(AppDbContext context, IEmailService emailService)
+        public AdminService(
+            AppDbContext context,
+            IEmailService emailService,
+            IPurchaseInvoiceService purchaseInvoices,
+            IUserNotificationService notifications)
         {
             _context = context;
             _emailService = emailService;
+            _purchaseInvoices = purchaseInvoices;
+            _notifications = notifications;
         }
 
         
@@ -246,16 +254,11 @@ namespace Autopartspro.Infrastructure.Services
 
             _context.StaffEmployments.Add(employment);
 
-            // Notify admin
-            _context.Notifications.Add(new Notification
-            {
-                UserId = user.Id,
-                Message = $"Staff account for {user.FullName} ({dto.Department} Dept.) was created by Admin.",
-                Type = NotificationType.General,
-                IsRead = false
-            });
-
             await _context.SaveChangesAsync();
+
+            await _notifications.NotifyAdminsAsync(
+                $"New staff member {user.FullName} ({dto.Department} department) was added to the system.",
+                NotificationType.General);
 
             await _emailService.SendStaffApprovalEmailAsync(user.Email, user.FullName);
 
@@ -453,7 +456,7 @@ namespace Autopartspro.Infrastructure.Services
 
             // Auto low stock notification
             if (dto.StockQuantity < LowStockThreshold)
-                await CreateLowStockNotificationAsync(dto.PartName, dto.StockQuantity);
+                await _notifications.NotifyLowStockAsync(dto.PartName, dto.StockQuantity);
 
             await _context.SaveChangesAsync();
             return await GetPartByIdAsync(part.Id);
@@ -475,7 +478,7 @@ namespace Autopartspro.Infrastructure.Services
 
             // Auto low stock notification
             if (dto.StockQuantity < LowStockThreshold)
-                await CreateLowStockNotificationAsync(dto.PartName, dto.StockQuantity);
+                await _notifications.NotifyLowStockAsync(dto.PartName, dto.StockQuantity);
 
             await _context.SaveChangesAsync();
             return await GetPartByIdAsync(id);
@@ -494,116 +497,15 @@ namespace Autopartspro.Infrastructure.Services
         
         // PURCHASE INVOICES
         
-        public async Task<PurchaseInvoiceListResponseDto> GetAllPurchaseInvoicesAsync()
-        {
-            var invoices = await _context.PurchaseInvoices
-                .Include(p => p.Vendor)
-                .Include(p => p.Items)
-                .OrderByDescending(p => p.PurchaseDate)
-                .ToListAsync();
+        public Task<PurchaseInvoiceListResponseDto> GetAllPurchaseInvoicesAsync() =>
+            _purchaseInvoices.GetAllAsync();
 
-            var invoiceDtos = invoices.Select(p => new PurchaseInvoiceResponseDto
-            {
-                Id = p.Id,
-                InvoiceNumber = p.InvoiceNumber,
-                VendorName = p.Vendor.VendorName,
-                VendorId = p.VendorId,
-                TotalItems = p.Items.Sum(i => i.Quantity),
-                TotalAmount = p.TotalAmount,
-                PurchaseDate = p.PurchaseDate,
-                Status = p.Status.ToString()
-            }).ToList();
+        public Task<PurchaseInvoiceResponseDto> GetPurchaseInvoiceByIdAsync(Guid id) =>
+            _purchaseInvoices.GetByIdAsync(id);
 
-            return new PurchaseInvoiceListResponseDto
-            {
-                TotalInvoices = invoiceDtos.Count,
-                TotalValue = invoiceDtos.Sum(i => i.TotalAmount),
-                Completed = invoiceDtos.Count(i => i.Status == "Completed"),
-                PendingOrProcessing = invoiceDtos.Count(i =>
-                    i.Status == "Pending" || i.Status == "Processing"),
-                Invoices = invoiceDtos
-            };
-        }
-
-        public async Task<PurchaseInvoiceResponseDto> GetPurchaseInvoiceByIdAsync(Guid id)
-        {
-            var invoice = await _context.PurchaseInvoices
-                .Include(p => p.Vendor)
-                .Include(p => p.Items).ThenInclude(i => i.Part)
-                .FirstOrDefaultAsync(p => p.Id == id)
-                ?? throw new Exception("Invoice not found.");
-
-            return new PurchaseInvoiceResponseDto
-            {
-                Id = invoice.Id,
-                InvoiceNumber = invoice.InvoiceNumber,
-                VendorName = invoice.Vendor.VendorName,
-                VendorId = invoice.VendorId,
-                TotalItems = invoice.Items.Sum(i => i.Quantity),
-                TotalAmount = invoice.TotalAmount,
-                PurchaseDate = invoice.PurchaseDate,
-                Status = invoice.Status.ToString(),
-                Items = invoice.Items.Select(i => new PurchaseInvoiceItemResponseDto
-                {
-                    PartName = i.Part.PartName,
-                    Category = i.Part.Category,
-                    Quantity = i.Quantity,
-                    UnitPrice = i.UnitPrice,
-                    SubTotal = i.SubTotal
-                }).ToList()
-            };
-        }
-
-        public async Task<PurchaseInvoiceResponseDto> CreatePurchaseInvoiceAsync(
-            CreatePurchaseInvoiceDto dto, Guid adminId)
-        {
-            var vendor = await _context.Vendors.FindAsync(dto.VendorId)
-                ?? throw new Exception("Vendor not found.");
-
-            // Generate invoice number PI-YYYY-XXX
-            var count = await _context.PurchaseInvoices.CountAsync();
-            var invoiceNumber = $"PI-{DateTime.UtcNow.Year}-{(count + 1):D3}";
-
-            decimal totalAmount = 0;
-            var invoiceItems = new List<PurchaseInvoiceItem>();
-
-            foreach (var item in dto.Items)
-            {
-                var part = await _context.Parts.FindAsync(item.PartId)
-                    ?? throw new Exception($"Part not found: {item.PartId}");
-
-                var subTotal = item.Quantity * item.UnitPrice;
-                totalAmount += subTotal;
-
-                invoiceItems.Add(new PurchaseInvoiceItem
-                {
-                    PartId = item.PartId,
-                    Quantity = item.Quantity,
-                    UnitPrice = item.UnitPrice,
-                    SubTotal = subTotal
-                });
-
-                // Update stock
-                part.StockQuantity += item.Quantity;
-                part.UpdatedAt = DateTime.UtcNow;
-            }
-
-            var invoice = new PurchaseInvoice
-            {
-                InvoiceNumber = invoiceNumber,
-                VendorId = dto.VendorId,
-                AdminId = adminId,
-                TotalAmount = totalAmount,
-                PurchaseDate = dto.PurchaseDate,
-                Status = PurchaseInvoiceStatus.Pending,
-                Items = invoiceItems
-            };
-
-            _context.PurchaseInvoices.Add(invoice);
-            await _context.SaveChangesAsync();
-
-            return await GetPurchaseInvoiceByIdAsync(invoice.Id);
-        }
+        public Task<PurchaseInvoiceResponseDto> CreatePurchaseInvoiceAsync(
+            CreatePurchaseInvoiceDto dto, Guid adminId) =>
+            _purchaseInvoices.CreateAsync(dto, adminId, allowAutoCreateVendor: true);
 
         public async Task<string> UpdatePurchaseInvoiceStatusAsync(Guid id, string status)
         {
@@ -823,113 +725,24 @@ namespace Autopartspro.Infrastructure.Services
         
         // NOTIFICATIONS
         
-        public async Task<NotificationListDto> GetAllNotificationsAsync(
-            Guid adminId, string? type)
+        public Task<NotificationListDto> GetAllNotificationsAsync(Guid adminId, string? type) =>
+            _notifications.GetForUserAsync(adminId, type);
+
+        public async Task<string> MarkNotificationAsReadAsync(Guid notificationId, Guid adminId)
         {
-            var query = _context.Notifications
-                .Where(n => n.UserId == adminId)
-                .AsQueryable();
-
-            if (!string.IsNullOrEmpty(type) && type != "All")
-            {
-                var notifType = MapNotificationFilterType(type);
-                if (notifType.HasValue)
-                    query = query.Where(n => n.Type == notifType.Value);
-            }
-
-            var notifications = await query
-                .OrderByDescending(n => n.CreatedAt)
-                .ToListAsync();
-
-            var all = await _context.Notifications
-                .Where(n => n.UserId == adminId)
-                .ToListAsync();
-
-            return new NotificationListDto
-            {
-                TotalUnread = all.Count(n => !n.IsRead),
-                LowStockCount = all.Count(n => n.Type == NotificationType.LowStock && !n.IsRead),
-                CreditReminderCount = all.Count(n => n.Type == NotificationType.CreditReminder && !n.IsRead),
-                InfoCount = all.Count(n => n.Type == NotificationType.General && !n.IsRead),
-                Notifications = notifications.Select(n => new NotificationResponseDto
-                {
-                    Id = n.Id,
-                    Title = GetNotificationTitle(n),
-                    Message = n.Message,
-                    Type = MapNotificationDisplayType(n.Type),
-                    IsRead = n.IsRead,
-                    CreatedAt = n.CreatedAt
-                }).ToList()
-            };
-        }
-
-        public async Task<string> MarkNotificationAsReadAsync(Guid notificationId)
-        {
-            var notification = await _context.Notifications.FindAsync(notificationId)
-                ?? throw new Exception("Notification not found.");
-
-            notification.IsRead = true;
-            await _context.SaveChangesAsync();
+            await _notifications.MarkReadAsync(notificationId, adminId);
             return "Notification marked as read.";
         }
 
         public async Task<string> MarkAllNotificationsAsReadAsync(Guid adminId)
         {
-            var notifications = await _context.Notifications
-                .Where(n => n.UserId == adminId && !n.IsRead)
-                .ToListAsync();
-
-            foreach (var n in notifications)
-                n.IsRead = true;
-
-            await _context.SaveChangesAsync();
+            await _notifications.MarkAllReadAsync(adminId);
             return "All notifications marked as read.";
         }
 
         
         // HELPERS
         
-        private async Task CreateLowStockNotificationAsync(string partName, int stock)
-        {
-            var admin = await _context.Users
-                .FirstOrDefaultAsync(u => u.Role == RoleType.Admin);
-
-            if (admin == null) return;
-
-            _context.Notifications.Add(new Notification
-            {
-                UserId = admin.Id,
-                Message = $"{partName} stock has dropped to {stock} units — below the minimum threshold of 10. Immediate reorder recommended.",
-                Type = NotificationType.LowStock,
-                IsRead = false
-            });
-        }
-
-        private static string GetNotificationTitle(Notification n) => n.Type switch
-        {
-            NotificationType.LowStock => $"Low Stock Alert",
-            NotificationType.CreditReminder => "Credit Reminder",
-            NotificationType.General => "System Info",
-            _ => "Notification"
-        };
-
-        private static string MapNotificationDisplayType(NotificationType type) => type switch
-        {
-            NotificationType.LowStock => "Low Stock",
-            NotificationType.CreditReminder => "Credit Reminder",
-            NotificationType.General => "Info",
-            _ => "Info"
-        };
-
-        private static NotificationType? MapNotificationFilterType(string type) => type switch
-        {
-            "Low Stock" => NotificationType.LowStock,
-            "Credit Reminder" => NotificationType.CreditReminder,
-            "Info" => NotificationType.General,
-            _ when Enum.TryParse<NotificationType>(type, true, out var parsed) => parsed,
-            _ => null
-        };
-
         private static string FormatTimeAgo(DateTime utc)
         {
             var span = DateTime.UtcNow - utc;

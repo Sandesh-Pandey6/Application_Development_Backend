@@ -4,6 +4,7 @@ namespace Autopartspro.Domain.Enums
     {
         Pending,
         Confirmed,
+        RescheduleProposed,
         Cancelled,
         Completed
     }

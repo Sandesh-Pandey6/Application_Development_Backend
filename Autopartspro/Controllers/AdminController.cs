@@ -1,4 +1,4 @@
-using Autopartspro.Application.DOTs.admin;
+using Autopartspro.Application.Dtos.Admin;
 using Autopartspro.Application.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -12,10 +12,12 @@ namespace Autopartspro.Controllers
     public class AdminController : ControllerBase
     {
         private readonly IAdminService _adminService;
+        private readonly IAdminProfileService _adminProfile;
 
-        public AdminController(IAdminService adminService)
+        public AdminController(IAdminService adminService, IAdminProfileService adminProfile)
         {
             _adminService = adminService;
+            _adminProfile = adminProfile;
         }
 
         private Guid GetAdminId() =>
@@ -181,7 +183,7 @@ namespace Autopartspro.Controllers
         [HttpPatch("notifications/{id}/read")]
         public async Task<IActionResult> MarkAsRead(Guid id)
         {
-            var result = await _adminService.MarkNotificationAsReadAsync(id);
+            var result = await _adminService.MarkNotificationAsReadAsync(id, GetAdminId());
             return Ok(new { message = result });
         }
 
@@ -190,6 +192,38 @@ namespace Autopartspro.Controllers
         {
             var result = await _adminService.MarkAllNotificationsAsReadAsync(GetAdminId());
             return Ok(new { message = result });
+        }
+
+        [HttpGet("profile")]
+        public async Task<IActionResult> GetProfile()
+        {
+            try
+            {
+                var profile = await _adminProfile.GetProfileAsync(GetAdminId());
+                return Ok(profile);
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(new { message = ex.Message });
+            }
+        }
+
+        [HttpPut("profile")]
+        public async Task<IActionResult> UpdateProfile([FromBody] UpdateAdminProfileDto dto)
+        {
+            try
+            {
+                var profile = await _adminProfile.UpdateProfileAsync(GetAdminId(), dto);
+                return Ok(profile);
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(new { message = ex.Message });
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
         }
     }
 }

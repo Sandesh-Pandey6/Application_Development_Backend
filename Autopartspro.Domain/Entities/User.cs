@@ -6,12 +6,16 @@ namespace Autopartspro.Domain.Entities
     {
         public string FullName { get; set; } = string.Empty;
         public string Email { get; set; } = string.Empty;
+        /// <summary>Public contact email for admin (e.g. customer inquiries). Separate from login email.</summary>
+        public string? BusinessEmail { get; set; }
         public string PasswordHash { get; set; } = string.Empty;
         public string PhoneNumber { get; set; } = string.Empty;
         public string City { get; set; } = string.Empty;
         public RoleType Role { get; set; }
         public StatusType Status { get; set; } = StatusType.Active;
         public bool IsEmailVerified { get; set; } = false;
+        /// <summary>True when staff registered the account with a temporary default password.</summary>
+        public bool MustChangePassword { get; set; }
 
         // Navigation Properties
         public ICollection<Vehicle> Vehicles { get; set; } = new List<Vehicle>();

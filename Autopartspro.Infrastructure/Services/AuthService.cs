@@ -1,4 +1,4 @@
-using Autopartspro.Application.DOTs.auth;
+using Autopartspro.Application.Dtos.Auth;
 using Autopartspro.Application.Interfaces;
 using Autopartspro.Domain.Entities;
 using Autopartspro.Domain.Enums;
@@ -255,7 +255,8 @@ namespace Autopartspro.Infrastructure.Services
                 FullName = user.FullName,
                 Email = user.Email,
                 Role = user.Role.ToString(),
-                ExpiresAt = DateTime.UtcNow.AddDays(7)
+                ExpiresAt = DateTime.UtcNow.AddDays(7),
+                MustChangePassword = user.MustChangePassword,
             };
         }
 

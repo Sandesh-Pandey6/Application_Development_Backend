@@ -1,4 +1,4 @@
-using Autopartspro.Application.DOTs.report;
+using Autopartspro.Application.Dtos.Report;
 
 namespace Autopartspro.Application.Interfaces
 {

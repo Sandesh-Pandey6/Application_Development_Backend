@@ -1,4 +1,4 @@
-using Autopartspro.Application.DOTs.auth;
+using Autopartspro.Application.Dtos.Auth;
 
 namespace Autopartspro.Application.Interfaces
 {

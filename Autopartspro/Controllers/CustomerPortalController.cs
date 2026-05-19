@@ -1,5 +1,6 @@
 using System.Security.Claims;
-using Autopartspro.Application.DOTs.customer;
+using Autopartspro.Application.Dtos.Auth;
+using Autopartspro.Application.Dtos.Customer;
 using Autopartspro.Application.Interfaces;
 using Autopartspro.Domain.Entities;
 using Autopartspro.Domain.Enums;
@@ -17,15 +18,24 @@ public class CustomerPortalController : ControllerBase
 {
     private readonly ICustomerService _customerService;
     private readonly ISalesInvoiceService _salesInvoiceService;
+    private readonly IUserNotificationService _notifications;
+    private readonly IAppointmentSchedulingService _scheduling;
+    private readonly IUserPasswordService _passwords;
     private readonly AppDbContext _db;
 
     public CustomerPortalController(
         ICustomerService customerService,
         ISalesInvoiceService salesInvoiceService,
+        IUserNotificationService notifications,
+        IAppointmentSchedulingService scheduling,
+        IUserPasswordService passwords,
         AppDbContext db)
     {
         _customerService = customerService;
         _salesInvoiceService = salesInvoiceService;
+        _notifications = notifications;
+        _scheduling = scheduling;
+        _passwords = passwords;
         _db = db;
     }
 
@@ -53,6 +63,31 @@ public class CustomerPortalController : ControllerBase
         }
     }
 
+    [HttpPost("change-password")]
+    public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordDto dto)
+    {
+        var userId = GetUserId();
+        if (userId == null) return UnauthorizedSession();
+        try
+        {
+            var profile = await _passwords.ChangePasswordAsync(userId.Value, dto, RoleType.Customer);
+            return Ok(new
+            {
+                message = "Password updated successfully.",
+                mustChangePassword = profile.MustChangePassword,
+                profile,
+            });
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
     [HttpPost("vehicles")]
     public async Task<IActionResult> AddVehicle([FromBody] CreateVehicleDto dto)
     {
@@ -66,6 +101,10 @@ public class CustomerPortalController : ControllerBase
         catch (KeyNotFoundException ex)
         {
             return NotFound(new { message = ex.Message });
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
         }
     }
 
@@ -82,6 +121,10 @@ public class CustomerPortalController : ControllerBase
         catch (KeyNotFoundException ex)
         {
             return NotFound(new { message = ex.Message });
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
         }
     }
 
@@ -128,24 +171,28 @@ public class CustomerPortalController : ControllerBase
             return BadRequest(new { message = "Invalid appointment date." });
 
         var notes = BuildNotesWithVehicle(dto.Vehicle, dto.Notes);
+        var preferredTime = _scheduling.ParseTimeSlot(dto.Time);
         var appointment = new Appointment
         {
             CustomerId = userId.Value,
             ServiceType = dto.ServiceType.Trim(),
             PreferredDate = preferredDate,
-            PreferredTime = ParseAppointmentTime(dto.Time),
+            PreferredTime = preferredTime,
             Notes = notes,
             Status = AppointmentStatus.Pending
         };
 
         _db.Appointments.Add(appointment);
-        _db.Notifications.Add(new Notification
-        {
-            UserId = userId.Value,
-            Message = $"Your {dto.ServiceType} appointment on {preferredDate:yyyy-MM-dd} is pending confirmation.",
-            Type = NotificationType.AppointmentConfirmation
-        });
         await _db.SaveChangesAsync();
+
+        await _notifications.NotifyUserAsync(
+            userId.Value,
+            $"Your {dto.ServiceType} appointment on {preferredDate:yyyy-MM-dd} is pending confirmation.",
+            NotificationType.AppointmentConfirmation);
+
+        await _notifications.NotifyAdminsAndStaffAsync(
+            $"New appointment request: {dto.ServiceType} on {preferredDate:yyyy-MM-dd}.",
+            NotificationType.General);
 
         return Ok(MapAppointment(appointment));
     }
@@ -165,8 +212,80 @@ public class CustomerPortalController : ControllerBase
             return BadRequest(new { message = "This appointment cannot be cancelled." });
 
         appointment.Status = AppointmentStatus.Cancelled;
+        appointment.ProposedDate = null;
+        appointment.ProposedTime = null;
+        appointment.StaffNotes = null;
         appointment.UpdatedAt = DateTime.UtcNow;
         await _db.SaveChangesAsync();
+        return Ok(MapAppointment(appointment));
+    }
+
+    [HttpPost("appointments/{id:guid}/accept-reschedule")]
+    public async Task<IActionResult> AcceptReschedule(Guid id)
+    {
+        var userId = GetUserId();
+        if (userId == null) return UnauthorizedSession();
+
+        var appointment = await _db.Appointments
+            .FirstOrDefaultAsync(a => a.Id == id && a.CustomerId == userId.Value);
+        if (appointment == null)
+            return NotFound(new { message = "Appointment not found." });
+        if (appointment.Status != AppointmentStatus.RescheduleProposed)
+            return BadRequest(new { message = "No reschedule is waiting for your response." });
+        if (!appointment.ProposedDate.HasValue || !appointment.ProposedTime.HasValue)
+            return BadRequest(new { message = "Invalid reschedule proposal." });
+
+        if (await _scheduling.IsProposedSlotFullAsync(
+                appointment.ProposedDate.Value,
+                appointment.ProposedTime.Value,
+                appointment.Id))
+            return BadRequest(new { message = "The proposed time is no longer available. Contact the service centre." });
+
+        appointment.PreferredDate = appointment.ProposedDate.Value;
+        appointment.PreferredTime = appointment.ProposedTime.Value;
+        appointment.ProposedDate = null;
+        appointment.ProposedTime = null;
+        appointment.StaffNotes = null;
+        appointment.Status = AppointmentStatus.Confirmed;
+        appointment.UpdatedAt = DateTime.UtcNow;
+        await _db.SaveChangesAsync();
+
+        var when = $"{appointment.PreferredDate:yyyy-MM-dd} at {_scheduling.FormatTimeSlot(appointment.PreferredTime)}";
+        await _notifications.NotifyUserAsync(
+            userId.Value,
+            $"You accepted the new appointment time: {when}.",
+            NotificationType.AppointmentConfirmation);
+        await _notifications.NotifyAdminsAndStaffAsync(
+            $"Customer accepted reschedule for {appointment.ServiceType} on {when}.",
+            NotificationType.General);
+
+        return Ok(MapAppointment(appointment));
+    }
+
+    [HttpPost("appointments/{id:guid}/decline-reschedule")]
+    public async Task<IActionResult> DeclineReschedule(Guid id)
+    {
+        var userId = GetUserId();
+        if (userId == null) return UnauthorizedSession();
+
+        var appointment = await _db.Appointments
+            .FirstOrDefaultAsync(a => a.Id == id && a.CustomerId == userId.Value);
+        if (appointment == null)
+            return NotFound(new { message = "Appointment not found." });
+        if (appointment.Status != AppointmentStatus.RescheduleProposed)
+            return BadRequest(new { message = "No reschedule is waiting for your response." });
+
+        appointment.Status = AppointmentStatus.Cancelled;
+        appointment.ProposedDate = null;
+        appointment.ProposedTime = null;
+        appointment.StaffNotes = null;
+        appointment.UpdatedAt = DateTime.UtcNow;
+        await _db.SaveChangesAsync();
+
+        await _notifications.NotifyAdminsAndStaffAsync(
+            $"Customer declined the proposed reschedule for {appointment.ServiceType} ({appointment.PreferredDate:yyyy-MM-dd}).",
+            NotificationType.General);
+
         return Ok(MapAppointment(appointment));
     }
 
@@ -204,13 +323,16 @@ public class CustomerPortalController : ControllerBase
         };
 
         _db.PartRequests.Add(request);
-        _db.Notifications.Add(new Notification
-        {
-            UserId = userId.Value,
-            Message = $"Part request for \"{request.PartName}\" has been submitted.",
-            Type = NotificationType.General
-        });
         await _db.SaveChangesAsync();
+
+        await _notifications.NotifyUserAsync(
+            userId.Value,
+            $"Part request for \"{request.PartName}\" has been submitted. We will notify you when it is available.",
+            NotificationType.General);
+
+        await _notifications.NotifyAdminsAndStaffAsync(
+            $"Customer requested part: \"{request.PartName}\" ({request.VehicleModel}, urgency: {request.UrgencyLevel}).",
+            NotificationType.General);
 
         return Ok(MapPartRequest(request));
     }
@@ -241,7 +363,13 @@ public class CustomerPortalController : ControllerBase
         if (userId == null) return UnauthorizedSession();
 
         var list = await _db.Reviews
-            .Where(r => r.CustomerId == userId.Value)
+            .Include(r => r.RelatedInvoice)
+            .ThenInclude(i => i!.Items)
+            .ThenInclude(li => li.Part)
+            .Where(r =>
+                r.CustomerId == userId.Value &&
+                r.RelatedInvoiceId != null &&
+                r.ReviewCategory == ReviewCategory.PartsPurchased)
             .OrderByDescending(r => r.CreatedAt)
             .ToListAsync();
 
@@ -258,6 +386,24 @@ public class CustomerPortalController : ControllerBase
             return BadRequest(new { message = "Rating must be between 1 and 5." });
         if (string.IsNullOrWhiteSpace(dto.Title))
             return BadRequest(new { message = "Review title is required." });
+        if (string.IsNullOrWhiteSpace(dto.Content))
+            return BadRequest(new { message = "Review details are required." });
+        if (dto.InvoiceId == Guid.Empty)
+            return BadRequest(new { message = "Select a purchase to review." });
+
+        var invoice = await _db.SalesInvoices
+            .Include(s => s.Items)
+            .ThenInclude(i => i.Part)
+            .FirstOrDefaultAsync(s => s.Id == dto.InvoiceId && s.CustomerId == userId.Value);
+        if (invoice == null)
+            return BadRequest(new { message = "You can only review parts from your own purchases." });
+        if (!invoice.Items.Any(i => i.PartId != Guid.Empty))
+            return BadRequest(new { message = "This purchase has no parts to review." });
+
+        var alreadyReviewed = await _db.Reviews.AnyAsync(r =>
+            r.CustomerId == userId.Value && r.RelatedInvoiceId == invoice.Id);
+        if (alreadyReviewed)
+            return BadRequest(new { message = "You have already reviewed this purchase." });
 
         var review = new Review
         {
@@ -265,12 +411,20 @@ public class CustomerPortalController : ControllerBase
             Rating = dto.Rating,
             Title = dto.Title.Trim(),
             Description = dto.Content.Trim(),
-            ReviewCategory = ParseReviewCategory(dto.Service)
+            ReviewCategory = ReviewCategory.PartsPurchased,
+            RelatedInvoiceId = invoice.Id
         };
 
         _db.Reviews.Add(review);
         await _db.SaveChangesAsync();
-        return Ok(MapReview(review));
+
+        var saved = await _db.Reviews
+            .Include(r => r.RelatedInvoice)
+            .ThenInclude(i => i!.Items)
+            .ThenInclude(li => li.Part)
+            .FirstAsync(r => r.Id == review.Id);
+
+        return Ok(MapReview(saved));
     }
 
     [HttpGet("notifications")]
@@ -340,6 +494,135 @@ public class CustomerPortalController : ControllerBase
         return NoContent();
     }
 
+    [HttpGet("parts")]
+    public async Task<IActionResult> ListParts([FromQuery] string? search)
+    {
+        var q = _db.Parts.AsNoTracking().Where(p => p.StockQuantity > 0);
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var s = search.Trim().ToLower();
+            q = q.Where(p =>
+                p.PartName.ToLower().Contains(s) ||
+                p.Category.ToLower().Contains(s) ||
+                (p.Description != null && p.Description.ToLower().Contains(s)));
+        }
+
+        var items = await q.OrderBy(p => p.PartName).ToListAsync();
+        return Ok(items.Select(MapCatalogPart));
+    }
+
+    [HttpGet("parts/{id:guid}")]
+    public async Task<IActionResult> GetPart(Guid id)
+    {
+        var part = await _db.Parts.AsNoTracking().FirstOrDefaultAsync(p => p.Id == id);
+        if (part is null)
+            return NotFound(new { message = "Part not found." });
+        if (part.StockQuantity <= 0)
+            return NotFound(new { message = "This part is currently out of stock." });
+        return Ok(MapCatalogPart(part));
+    }
+
+    [HttpPost("parts/checkout")]
+    public async Task<IActionResult> CheckoutParts([FromBody] CustomerCheckoutDto dto)
+    {
+        var userId = GetUserId();
+        if (userId == null) return UnauthorizedSession();
+
+        if (dto.Items == null || dto.Items.Count == 0)
+            return BadRequest(new { message = "Add at least one part to your order." });
+
+        var customer = await _db.Users.FindAsync(userId.Value);
+        if (customer is null)
+            return NotFound(new { message = "Customer account not found." });
+
+        var staffUser = await _db.Users
+            .Where(u => u.Role == RoleType.Staff || u.Role == RoleType.Admin)
+            .OrderBy(u => u.Role == RoleType.Staff ? 0 : 1)
+            .FirstOrDefaultAsync();
+        if (staffUser is null)
+            return BadRequest(new { message = "Online checkout is not available right now. Please contact the centre." });
+
+        var partIds = dto.Items.Select(i => i.PartId).Distinct().ToList();
+        var parts = await _db.Parts.Where(p => partIds.Contains(p.Id)).ToListAsync();
+        if (parts.Count != partIds.Count)
+            return BadRequest(new { message = "One or more parts were not found." });
+
+        foreach (var item in dto.Items)
+        {
+            if (item.Quantity < 1)
+                return BadRequest(new { message = "Quantity must be at least 1." });
+            var part = parts.First(p => p.Id == item.PartId);
+            if (part.StockQuantity < item.Quantity)
+            {
+                return Conflict(new
+                {
+                    message = $"Insufficient stock for '{part.PartName}'. Available: {part.StockQuantity}, requested: {item.Quantity}."
+                });
+            }
+        }
+
+        const decimal loyaltyThreshold = 5000m;
+        const decimal loyaltyRate = 0.10m;
+
+        await using var tx = await _db.Database.BeginTransactionAsync();
+
+        var invoice = new SalesInvoice
+        {
+            InvoiceNumber = await GenerateCustomerInvoiceNumberAsync(),
+            CustomerId = userId.Value,
+            StaffId = staffUser.Id,
+            SaleDate = DateTime.UtcNow,
+            PaymentStatus = MapCustomerPaymentStatus(dto.PaymentStatus),
+        };
+
+        decimal subtotal = 0m;
+        decimal loyaltyDiscount = 0m;
+        foreach (var item in dto.Items)
+        {
+            var part = parts.First(p => p.Id == item.PartId);
+            var line = new SalesInvoiceItem
+            {
+                PartId = part.Id,
+                Quantity = item.Quantity,
+                UnitPrice = part.Price,
+                SubTotal = part.Price * item.Quantity,
+            };
+            subtotal += line.SubTotal;
+            if (line.SubTotal > loyaltyThreshold)
+                loyaltyDiscount += Math.Round(line.SubTotal * loyaltyRate, 2);
+
+            invoice.Items.Add(line);
+            part.StockQuantity -= item.Quantity;
+            part.UpdatedAt = DateTime.UtcNow;
+        }
+
+        invoice.DiscountApplied = loyaltyDiscount > 0;
+        invoice.DiscountAmount = loyaltyDiscount;
+        invoice.SubTotal = subtotal;
+        invoice.TotalAmount = Math.Max(0m, subtotal - invoice.DiscountAmount);
+
+        _db.SalesInvoices.Add(invoice);
+        await _db.SaveChangesAsync();
+        await tx.CommitAsync();
+
+        await _db.Entry(invoice).Reference(x => x.Customer).LoadAsync();
+        foreach (var line in invoice.Items)
+            await _db.Entry(line).Reference(x => x.Part).LoadAsync();
+
+        await _notifications.NotifyUserAsync(
+            userId.Value,
+            $"Order {invoice.InvoiceNumber} confirmed — total Rs. {invoice.TotalAmount:N2}." +
+            (loyaltyDiscount > 0 ? $" (includes Rs. {loyaltyDiscount:N2} loyalty savings)" : ""),
+            NotificationType.General);
+
+        await _notifications.NotifyAdminsAndStaffAsync(
+            $"{customer.FullName} placed an online parts order {invoice.InvoiceNumber} for Rs. {invoice.TotalAmount:N2}.",
+            NotificationType.General);
+
+        return Ok(MapPurchase(invoice));
+    }
+
     [HttpGet("purchases")]
     public async Task<IActionResult> GetPurchases()
     {
@@ -353,7 +636,13 @@ public class CustomerPortalController : ControllerBase
             .OrderByDescending(s => s.SaleDate)
             .ToListAsync();
 
-        return Ok(invoices.Select(MapPurchase));
+        var reviewedInvoiceIds = await _db.Reviews
+            .Where(r => r.CustomerId == userId.Value && r.RelatedInvoiceId != null)
+            .Select(r => r.RelatedInvoiceId!.Value)
+            .ToListAsync();
+        var reviewedSet = reviewedInvoiceIds.ToHashSet();
+
+        return Ok(invoices.Select(s => MapPurchase(s, reviewedSet.Contains(s.Id))));
     }
 
     [HttpGet("purchases/{id:guid}/download")]
@@ -382,43 +671,6 @@ public class CustomerPortalController : ControllerBase
         }
     }
 
-    [HttpGet("loyalty")]
-    public async Task<IActionResult> GetLoyalty()
-    {
-        var userId = GetUserId();
-        if (userId == null) return UnauthorizedSession();
-
-        var invoices = await _db.SalesInvoices
-            .Where(s => s.CustomerId == userId.Value)
-            .OrderByDescending(s => s.SaleDate)
-            .ToListAsync();
-
-        var totalPoints = invoices.Sum(i => (int)Math.Floor(i.TotalAmount / 100m));
-        var discountPercentage = invoices.Any(i => i.TotalAmount > 5000) ? 10 : 0;
-
-        var transactions = invoices.Select(i => new
-        {
-            date = i.SaleDate,
-            description = $"Purchase {i.InvoiceNumber}",
-            points = (int)Math.Floor(i.TotalAmount / 100m),
-            type = "earned"
-        }).ToList();
-
-        return Ok(new
-        {
-            totalPoints,
-            discountPercentage,
-            totalPurchases = invoices.Count,
-            transactions
-        });
-    }
-
-    [HttpPost("loyalty/redeem")]
-    public IActionResult RedeemPoints([FromBody] RedeemPointsDto dto)
-    {
-        return BadRequest(new { message = "Point redemption is applied automatically at checkout. Contact support for assistance." });
-    }
-
     private Guid? GetUserId()
     {
         var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
@@ -430,38 +682,91 @@ public class CustomerPortalController : ControllerBase
     private static IActionResult UnauthorizedSession() =>
         new UnauthorizedObjectResult(new { message = "Invalid session. Please sign in again." });
 
-    private static object MapAppointment(Appointment a) => new
+    private object MapAppointment(Appointment a) => new
     {
         id = a.Id.ToString(),
         service = a.ServiceType,
         date = a.PreferredDate.ToString("yyyy-MM-dd"),
-        time = FormatTime(a.PreferredTime),
+        time = _scheduling.FormatTimeSlot(a.PreferredTime),
         status = MapAppointmentStatus(a.Status),
+        statusRaw = a.Status.ToString(),
         vehicle = ExtractVehicle(a.Notes) ?? "—",
-        amount = "—"
+        amount = "—",
+        staffNotes = a.StaffNotes,
+        proposedDate = a.ProposedDate?.ToString("yyyy-MM-dd"),
+        proposedTime = a.ProposedTime.HasValue ? _scheduling.FormatTimeSlot(a.ProposedTime.Value) : null,
+        canAcceptReschedule = a.Status == AppointmentStatus.RescheduleProposed,
+        canCancel = a.Status is AppointmentStatus.Pending or AppointmentStatus.Confirmed
+            or AppointmentStatus.RescheduleProposed,
+    };
+
+    private async Task<string> GenerateCustomerInvoiceNumberAsync()
+    {
+        var prefix = $"INV-{DateTime.UtcNow:yyyyMMdd}-";
+        var todayCount = await _db.SalesInvoices.CountAsync(s => s.InvoiceNumber.StartsWith(prefix));
+        return $"{prefix}{(todayCount + 1):D4}";
+    }
+
+    private static PaymentStatus MapCustomerPaymentStatus(string? status)
+    {
+        if (string.IsNullOrWhiteSpace(status))
+            return PaymentStatus.Paid;
+        var normalized = status.Trim().ToLowerInvariant();
+        return normalized switch
+        {
+            "paid" => PaymentStatus.Paid,
+            "unpaid" or "pending" or "credit" => PaymentStatus.Unpaid,
+            _ => PaymentStatus.Paid
+        };
+    }
+
+    private static object MapCatalogPart(Part p) => new
+    {
+        id = p.Id.ToString(),
+        name = p.PartName,
+        partCode = string.IsNullOrWhiteSpace(p.Category) ? null : p.Category,
+        description = string.IsNullOrWhiteSpace(p.Description) ? null : p.Description,
+        price = p.Price,
+        stockQuantity = p.StockQuantity,
+        imageUrl = p.ImageUrl,
     };
 
     private static object MapPartRequest(PartRequest p) => new
     {
         id = p.Id.ToString(),
         partName = p.PartName,
+        description = p.PartDescription,
         vehicle = p.VehicleModel,
         urgency = p.UrgencyLevel.ToString(),
         status = MapPartRequestStatus(p.Status),
+        statusRaw = p.Status.ToString(),
         date = p.CreatedAt,
-        estimatedPrice = (string?)null
+        estimatedAvailableDate = p.EstimatedAvailableDate?.ToString("yyyy-MM-dd"),
+        staffNotes = p.StaffNotes,
+        staffRespondedAt = p.StaffRespondedAt,
+        escalatedAt = p.EscalatedAt,
+        canDelete = p.Status == PartRequestStatus.Pending,
     };
 
-    private static object MapReview(Review r) => new
+    private static object MapReview(Review r)
     {
-        id = r.Id.ToString(),
-        rating = r.Rating,
-        title = r.Title,
-        content = r.Description,
-        service = MapReviewServiceLabel(r.ReviewCategory),
-        date = r.CreatedAt,
-        helpful = 0
-    };
+        var partsLabel = r.RelatedInvoice != null
+            ? FormatInvoiceParts(r.RelatedInvoice)
+            : null;
+        return new
+        {
+            id = r.Id.ToString(),
+            rating = r.Rating,
+            title = r.Title,
+            content = r.Description,
+            service = MapReviewServiceLabel(r.ReviewCategory),
+            date = r.CreatedAt,
+            helpful = 0,
+            invoiceId = r.RelatedInvoiceId?.ToString(),
+            invoiceNumber = r.RelatedInvoice?.InvoiceNumber,
+            items = partsLabel
+        };
+    }
 
     private static object MapNotification(Notification n) => new
     {
@@ -473,12 +778,10 @@ public class CustomerPortalController : ControllerBase
         createdAt = n.CreatedAt
     };
 
-    private static object MapPurchase(SalesInvoice s)
+    private static object MapPurchase(SalesInvoice s, bool hasReview = false)
     {
         var itemNames = s.Items.Select(i => i.Part?.PartName ?? "Part").ToList();
-        var itemsLabel = itemNames.Count == 0
-            ? "—"
-            : string.Join(", ", itemNames.Take(3)) + (itemNames.Count > 3 ? $" +{itemNames.Count - 3} more" : "");
+        var itemsLabel = FormatInvoiceParts(s);
 
         var original = s.SubTotal + s.DiscountAmount;
         var discountPct = original > 0 && s.DiscountAmount > 0
@@ -491,26 +794,51 @@ public class CustomerPortalController : ControllerBase
             invoiceId = s.Id.ToString(),
             date = s.SaleDate,
             items = itemsLabel,
+            parts = s.Items.Select(i => new
+            {
+                partId = i.PartId,
+                partName = i.Part?.PartName ?? "Part",
+                quantity = i.Quantity,
+                unitPrice = i.UnitPrice,
+                subTotal = i.SubTotal
+            }).ToList(),
             originalAmount = original,
             discountAmount = s.DiscountAmount,
             discountPercentage = discountPct,
             amount = s.TotalAmount,
-            status = s.PaymentStatus.ToString()
+            status = s.PaymentStatus.ToString(),
+            hasReview,
+            canReview = !hasReview && s.Items.Any(i => i.PartId != Guid.Empty)
         };
+    }
+
+    private static string FormatInvoiceParts(SalesInvoice s)
+    {
+        var itemNames = s.Items.Select(i => i.Part?.PartName ?? "Part").ToList();
+        if (itemNames.Count == 0) return "—";
+        return string.Join(", ", itemNames.Take(3)) + (itemNames.Count > 3 ? $" +{itemNames.Count - 3} more" : "");
     }
 
     private static string MapAppointmentStatus(AppointmentStatus status) => status switch
     {
+        AppointmentStatus.Pending => "Pending",
+        AppointmentStatus.Confirmed => "Confirmed",
+        AppointmentStatus.RescheduleProposed => "Reschedule Proposed",
         AppointmentStatus.Completed => "Completed",
         AppointmentStatus.Cancelled => "Cancelled",
-        _ => "Upcoming"
+        _ => status.ToString()
     };
 
     private static string MapPartRequestStatus(PartRequestStatus status) => status switch
     {
-        PartRequestStatus.Approved => "Available",
+        PartRequestStatus.Pending => "Pending",
+        PartRequestStatus.Estimated => "Available soon",
+        PartRequestStatus.EscalatedToAdmin => "With admin",
+        PartRequestStatus.Approved => "Ready to collect",
         PartRequestStatus.Rejected => "Rejected",
-        _ => "Searching"
+        PartRequestStatus.VendorRequested => "Ordered from vendor",
+        PartRequestStatus.InvoiceRecorded => "Vendor invoice received",
+        _ => status.ToString()
     };
 
     private static string MapReviewServiceLabel(ReviewCategory category) => category switch

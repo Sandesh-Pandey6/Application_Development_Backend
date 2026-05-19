@@ -1,4 +1,4 @@
-using Autopartspro.Application.DOTs.report;
+using Autopartspro.Application.Dtos.Report;
 using Autopartspro.Application.Interfaces;
 using Autopartspro.Domain.Enums;
 using Autopartspro.Infrastructure.Data;

@@ -79,10 +79,16 @@ builder.Services.AddScoped<IJwtService, JwtService>();
 builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddScoped<IOtpService, OtpService>();   // ← was missing
 builder.Services.AddScoped<ICustomerService, CustomerService>();
+builder.Services.AddScoped<IUserPasswordService, UserPasswordService>();
 builder.Services.AddScoped<IReportService, ReportService>();
 builder.Services.AddScoped<ISalesInvoiceService, SalesInvoiceService>();
 builder.Services.AddTransient<GlobalExceptionHandler>();
+builder.Services.AddScoped<IPurchaseInvoiceService, PurchaseInvoiceService>();
+builder.Services.AddScoped<IUserNotificationService, UserNotificationService>();
+builder.Services.AddScoped<IAppointmentSchedulingService, AppointmentSchedulingService>();
 builder.Services.AddScoped<IAdminService, AdminService>();
+builder.Services.AddScoped<IAdminProfileService, AdminProfileService>();
+builder.Services.AddScoped<IPartRequestAdminService, PartRequestAdminService>();
 
 // OpenAPI (.NET 10 built-in)
 builder.Services.AddOpenApi();
@@ -107,10 +113,35 @@ if (!app.Environment.IsDevelopment())
 }
 
 app.UseCors("AllowFrontend");
+
+var webRootPath = Path.Combine(app.Environment.ContentRootPath, "wwwroot");
+Directory.CreateDirectory(Path.Combine(webRootPath, "uploads", "parts"));
+app.UseStaticFiles();
+
 app.UseAuthentication();
 app.UseAuthorization();
 
-app.MapGet("/api/health", () => Results.Ok(new { status = "ok" }))
+app.MapGet("/api/health", async (AppDbContext db, CancellationToken ct) =>
+{
+    try
+    {
+        var canConnect = await db.Database.CanConnectAsync(ct);
+        if (!canConnect)
+        {
+            return Results.Json(
+                new { status = "error", database = "disconnected", message = "Cannot reach PostgreSQL." },
+                statusCode: StatusCodes.Status503ServiceUnavailable);
+        }
+
+        return Results.Ok(new { status = "ok", database = "connected" });
+    }
+    catch (Exception ex)
+    {
+        return Results.Json(
+            new { status = "error", database = "disconnected", message = ex.Message },
+            statusCode: StatusCodes.Status503ServiceUnavailable);
+    }
+})
     .AllowAnonymous();
 
 app.MapControllers();
@@ -120,6 +151,7 @@ using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     await db.Database.MigrateAsync();
+    await DatabaseSchemaPatches.ApplyAsync(db);
     // Legacy enum value 2 (removed Overdue status) -> Unpaid
     await db.Database.ExecuteSqlRawAsync(
         """UPDATE "SalesInvoices" SET "PaymentStatus" = 1 WHERE "PaymentStatus" = 2""");

@@ -1,4 +1,5 @@
 using Autopartspro.Application.Dtos;
+using Autopartspro.Application.Interfaces;
 using Autopartspro.Domain.Entities;
 using Autopartspro.Domain.Enums;
 using Autopartspro.Infrastructure.Data;
@@ -13,9 +14,17 @@ namespace Autopartspro.Controllers;
 [Authorize(Roles = "Admin,Staff")]
 public class CustomersController : ControllerBase
 {
+    public const string StaffRegisteredDefaultPassword = "1234567";
+
     private readonly AppDbContext _db;
 
-    public CustomersController(AppDbContext db) => _db = db;
+    private readonly IUserNotificationService _notifications;
+
+    public CustomersController(AppDbContext db, IUserNotificationService notifications)
+    {
+        _db = db;
+        _notifications = notifications;
+    }
 
     private IQueryable<User> CustomersQuery() =>
         _db.Users.AsNoTracking().Where(u => u.Role == RoleType.Customer);
@@ -101,7 +110,8 @@ public class CustomersController : ControllerBase
             Role = RoleType.Customer,
             Status = StatusType.Active,
             IsEmailVerified = true,
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword(Guid.NewGuid().ToString("N")),
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword(StaffRegisteredDefaultPassword),
+            MustChangePassword = true,
         };
 
         foreach (var vDto in dto.Vehicles)
@@ -125,6 +135,15 @@ public class CustomersController : ControllerBase
 
         _db.Users.Add(customer);
         await _db.SaveChangesAsync();
+
+        await _notifications.NotifyUserAsync(
+            customer.Id,
+            "Welcome to AutoParts Pro. Your account was created by our team. Sign in with your phone number and the temporary password you were given, then change your password.",
+            NotificationType.General);
+
+        await _notifications.NotifyAdminsAndStaffAsync(
+            $"New customer registered: {customer.FullName} ({customer.PhoneNumber}).",
+            NotificationType.General);
 
         return CreatedAtAction(nameof(Get), new { id = customer.Id }, ToDetail(customer));
     }

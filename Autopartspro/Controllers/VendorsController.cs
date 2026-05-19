@@ -45,6 +45,7 @@ public class VendorsController : ControllerBase
     }
 
     [HttpPost]
+    [Authorize(Roles = "Admin")]
     public async Task<ActionResult<VendorDto>> Create([FromBody] VendorUpsertDto dto)
     {
         var v = new Vendor
@@ -62,6 +63,7 @@ public class VendorsController : ControllerBase
     }
 
     [HttpPut("{id:guid}")]
+    [Authorize(Roles = "Admin")]
     public async Task<ActionResult<VendorDto>> Update(Guid id, [FromBody] VendorUpsertDto dto)
     {
         var v = await _db.Vendors.FindAsync(id);
@@ -79,6 +81,7 @@ public class VendorsController : ControllerBase
     }
 
     [HttpDelete("{id:guid}")]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Delete(Guid id)
     {
         var v = await _db.Vendors.FindAsync(id);

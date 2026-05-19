@@ -10,7 +10,8 @@ public record PartDto(
     decimal Price,
     int StockQuantity,
     Guid? VendorId,
-    string? VendorName
+    string? VendorName,
+    string? ImageUrl
 );
 
 public class PartUpsertDto
@@ -31,4 +32,7 @@ public class PartUpsertDto
     public int StockQuantity { get; set; }
 
     public Guid? VendorId { get; set; }
+
+    [MaxLength(500)]
+    public string? ImageUrl { get; set; }
 }

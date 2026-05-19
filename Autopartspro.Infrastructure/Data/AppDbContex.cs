@@ -1,4 +1,4 @@
-﻿using Autopartspro.Domain.Entities;
+using Autopartspro.Domain.Entities;
 using Autopartspro.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
 
@@ -120,6 +120,18 @@ namespace Autopartspro.Infrastructure.Data
                 .HasForeignKey(o => o.Email)
                 .HasPrincipalKey(u => u.Email)
                 .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<PartRequest>()
+                .HasOne(p => p.Vendor)
+                .WithMany()
+                .HasForeignKey(p => p.VendorId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<PartRequest>()
+                .HasOne(p => p.PurchaseInvoice)
+                .WithMany()
+                .HasForeignKey(p => p.PurchaseInvoiceId)
+                .OnDelete(DeleteBehavior.SetNull);
         }
     }
 }

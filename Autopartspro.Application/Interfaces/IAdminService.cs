@@ -1,4 +1,4 @@
-﻿using Autopartspro.Application.DOTs.admin;
+using Autopartspro.Application.Dtos.Admin;
 
 namespace Autopartspro.Application.Interfaces
 {
@@ -39,7 +39,7 @@ namespace Autopartspro.Application.Interfaces
 
         // Notifications
         Task<NotificationListDto> GetAllNotificationsAsync(Guid adminId, string? type);
-        Task<string> MarkNotificationAsReadAsync(Guid notificationId);
+        Task<string> MarkNotificationAsReadAsync(Guid notificationId, Guid adminId);
         Task<string> MarkAllNotificationsAsReadAsync(Guid adminId);
     }
 }

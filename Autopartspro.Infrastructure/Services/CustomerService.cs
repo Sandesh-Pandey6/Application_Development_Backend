@@ -1,5 +1,5 @@
-using Autopartspro.Application.DOTs.auth;
-using Autopartspro.Application.DOTs.customer;
+using Autopartspro.Application.Dtos.Auth;
+using Autopartspro.Application.Dtos.Customer;
 using Autopartspro.Application.Interfaces;
 using Autopartspro.Domain.Entities;
 using Autopartspro.Domain.Enums;
@@ -35,6 +35,7 @@ namespace Autopartspro.Infrastructure.Services
                 Role = user.Role.ToString(),
                 Status = user.Status.ToString(),
                 IsEmailVerified = user.IsEmailVerified,
+                MustChangePassword = user.MustChangePassword,
                 Vehicles = user.Vehicles.Select(v => new VehicleDto
                 {
                     Id = v.Id,
@@ -63,10 +64,44 @@ namespace Autopartspro.Infrastructure.Services
             return await GetProfileAsync(userId);
         }
 
+        public async Task<UserProfileDto> ChangePasswordAsync(Guid userId, ChangePasswordDto dto)
+        {
+            if (string.IsNullOrWhiteSpace(dto.NewPassword) || dto.NewPassword.Length < 6)
+                throw new ArgumentException("New password must be at least 6 characters.");
+
+            if (dto.NewPassword != dto.ConfirmNewPassword)
+                throw new ArgumentException("New password and confirmation do not match.");
+
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId);
+            if (user == null) throw new KeyNotFoundException("User not found.");
+
+            if (!BCrypt.Net.BCrypt.Verify(dto.CurrentPassword, user.PasswordHash))
+                throw new ArgumentException("Current password is incorrect.");
+
+            if (BCrypt.Net.BCrypt.Verify(dto.NewPassword, user.PasswordHash))
+                throw new ArgumentException("Choose a password different from your current password.");
+
+            user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.NewPassword);
+            user.MustChangePassword = false;
+            user.UpdatedAt = DateTime.UtcNow;
+            await _context.SaveChangesAsync();
+
+            return await GetProfileAsync(userId);
+        }
+
         public async Task<VehicleDto> AddVehicleAsync(Guid userId, CreateVehicleDto dto)
         {
             var user = await _context.Users.FindAsync(userId);
             if (user == null) throw new KeyNotFoundException("User not found.");
+
+            var plate = dto.NumberPlate?.Trim() ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(plate))
+                throw new ArgumentException("Number plate is required.");
+            if (string.IsNullOrWhiteSpace(dto.Make) || string.IsNullOrWhiteSpace(dto.Model))
+                throw new ArgumentException("Make and model are required.");
+
+            if (await _context.Vehicles.AnyAsync(v => v.NumberPlate.ToLower() == plate.ToLower()))
+                throw new ArgumentException($"Vehicle number '{plate}' is already registered.");
 
             if (!Enum.TryParse<FuelType>(dto.FuelType, true, out var fuelType))
             {
@@ -76,11 +111,11 @@ namespace Autopartspro.Infrastructure.Services
             var vehicle = new Vehicle
             {
                 CustomerId = userId,
-                Make = dto.Make,
-                Model = dto.Model,
+                Make = dto.Make.Trim(),
+                Model = dto.Model.Trim(),
                 Year = dto.Year,
                 FuelType = fuelType,
-                NumberPlate = dto.NumberPlate
+                NumberPlate = plate
             };
 
             _context.Vehicles.Add(vehicle);
@@ -102,14 +137,33 @@ namespace Autopartspro.Infrastructure.Services
             var vehicle = await _context.Vehicles.FirstOrDefaultAsync(v => v.Id == vehicleId && v.CustomerId == userId);
             if (vehicle == null) throw new KeyNotFoundException("Vehicle not found or does not belong to user.");
 
-            if (dto.Make != null) vehicle.Make = dto.Make;
-            if (dto.Model != null) vehicle.Model = dto.Model;
+            if (dto.Make != null)
+            {
+                if (string.IsNullOrWhiteSpace(dto.Make))
+                    throw new ArgumentException("Make cannot be empty.");
+                vehicle.Make = dto.Make.Trim();
+            }
+            if (dto.Model != null)
+            {
+                if (string.IsNullOrWhiteSpace(dto.Model))
+                    throw new ArgumentException("Model cannot be empty.");
+                vehicle.Model = dto.Model.Trim();
+            }
             if (dto.Year.HasValue) vehicle.Year = dto.Year.Value;
             if (dto.FuelType != null && Enum.TryParse<FuelType>(dto.FuelType, true, out var fuelType))
             {
                 vehicle.FuelType = fuelType;
             }
-            if (dto.NumberPlate != null) vehicle.NumberPlate = dto.NumberPlate;
+            if (dto.NumberPlate != null)
+            {
+                var plate = dto.NumberPlate.Trim();
+                if (string.IsNullOrWhiteSpace(plate))
+                    throw new ArgumentException("Number plate cannot be empty.");
+                if (await _context.Vehicles.AnyAsync(v =>
+                        v.NumberPlate.ToLower() == plate.ToLower() && v.Id != vehicleId))
+                    throw new ArgumentException($"Vehicle number '{plate}' is already registered.");
+                vehicle.NumberPlate = plate;
+            }
 
             await _context.SaveChangesAsync();
 

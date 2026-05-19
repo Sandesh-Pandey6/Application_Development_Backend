@@ -3,6 +3,7 @@ namespace Autopartspro.Application.Interfaces
     public interface IEmailService
     {
         Task SendEmailAsync(string toEmail, string subject, string body);
+        Task SendEmailAsync(string toEmail, string subject, string body, string? replyToEmail, string? replyToName);
         Task SendOtpEmailAsync(string toEmail, string otpCode, string purpose);
         Task SendWelcomeEmailAsync(string toEmail, string fullName);
         Task SendStaffApprovalEmailAsync(string toEmail, string fullName);

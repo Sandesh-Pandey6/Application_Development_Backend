@@ -18,7 +18,8 @@ public class AppDbContextFactory : IDesignTimeDbContextFactory<AppDbContext>
             .AddEnvironmentVariables()
             .Build();
 
-        var connectionString = configuration.GetConnectionString("Default")
+        var connectionString = configuration.GetConnectionString("DefaultConnection")
+            ?? configuration.GetConnectionString("Default")
             ?? "Host=localhost;Port=5432;Database=autopartspro;Username=postgres;Password=postgres";
 
         var options = new DbContextOptionsBuilder<AppDbContext>()

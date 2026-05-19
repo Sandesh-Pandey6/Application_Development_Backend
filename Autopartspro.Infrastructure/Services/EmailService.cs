@@ -41,13 +41,28 @@ namespace Autopartspro.Infrastructure.Services
             await client.DisconnectAsync(true, cts.Token);
         }
 
-        public async Task SendEmailAsync(string toEmail, string subject, string body)
+        public Task SendEmailAsync(string toEmail, string subject, string body) =>
+            SendEmailAsync(toEmail, subject, body, null, null);
+
+        public async Task SendEmailAsync(
+            string toEmail,
+            string subject,
+            string body,
+            string? replyToEmail,
+            string? replyToName)
         {
             var message = new MimeMessage();
             message.From.Add(new MailboxAddress(_senderName, _senderEmail));
             message.To.Add(MailboxAddress.Parse(toEmail));
             message.Subject = subject;
             message.Body = new TextPart("html") { Text = body };
+
+            if (!string.IsNullOrWhiteSpace(replyToEmail))
+            {
+                message.ReplyTo.Add(new MailboxAddress(
+                    string.IsNullOrWhiteSpace(replyToName) ? replyToEmail : replyToName.Trim(),
+                    replyToEmail.Trim()));
+            }
 
             try
             {

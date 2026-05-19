@@ -1,4 +1,4 @@
-using Autopartspro.Application.DOTs.auth;
+using Autopartspro.Application.Dtos.Auth;
 using Autopartspro.Application.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;

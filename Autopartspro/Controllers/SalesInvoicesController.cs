@@ -17,11 +17,16 @@ public class SalesInvoicesController : ControllerBase
 {
     private readonly AppDbContext _db;
     private readonly ISalesInvoiceService _salesInvoiceService;
+    private readonly IUserNotificationService _notifications;
 
-    public SalesInvoicesController(AppDbContext db, ISalesInvoiceService salesInvoiceService)
+    public SalesInvoicesController(
+        AppDbContext db,
+        ISalesInvoiceService salesInvoiceService,
+        IUserNotificationService notifications)
     {
         _db = db;
         _salesInvoiceService = salesInvoiceService;
+        _notifications = notifications;
     }
 
     [HttpGet]
@@ -169,6 +174,14 @@ public class SalesInvoicesController : ControllerBase
         await _db.Entry(invoice).Reference(x => x.Staff).LoadAsync();
         foreach (var line in invoice.Items)
             await _db.Entry(line).Reference(x => x.Part).LoadAsync();
+
+        if (paymentStatus == PaymentStatus.Unpaid && invoice.Customer is not null)
+        {
+            await _notifications.NotifyUserAsync(
+                invoice.CustomerId,
+                $"Invoice {invoice.InvoiceNumber} for Rs. {invoice.TotalAmount:N2} is on credit. Please arrange payment when convenient.",
+                NotificationType.CreditReminder);
+        }
 
         return CreatedAtAction(nameof(Get), new { id = invoice.Id }, MapInvoice(invoice));
     }
