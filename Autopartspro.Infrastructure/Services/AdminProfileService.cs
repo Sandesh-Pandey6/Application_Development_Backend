@@ -78,6 +78,7 @@ public class AdminProfileService : IAdminProfileService
         BusinessEmail = user.BusinessEmail,
         PhoneNumber = user.PhoneNumber,
         City = user.City,
+        ProfileImageUrl = user.ProfileImageUrl,
     };
 
     private static bool IsValidEmail(string email)

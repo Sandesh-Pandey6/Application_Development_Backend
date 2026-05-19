@@ -89,6 +89,8 @@ builder.Services.AddScoped<IAppointmentSchedulingService, AppointmentSchedulingS
 builder.Services.AddScoped<IAdminService, AdminService>();
 builder.Services.AddScoped<IAdminProfileService, AdminProfileService>();
 builder.Services.AddScoped<IPartRequestAdminService, PartRequestAdminService>();
+builder.Services.AddScoped<IOverduePaymentReminderService, OverduePaymentReminderService>();
+builder.Services.AddHostedService<EmailReminderService>();
 
 // OpenAPI (.NET 10 built-in)
 builder.Services.AddOpenApi();
@@ -116,6 +118,7 @@ app.UseCors("AllowFrontend");
 
 var webRootPath = Path.Combine(app.Environment.ContentRootPath, "wwwroot");
 Directory.CreateDirectory(Path.Combine(webRootPath, "uploads", "parts"));
+Directory.CreateDirectory(Path.Combine(webRootPath, "uploads", "profiles"));
 app.UseStaticFiles();
 
 app.UseAuthentication();

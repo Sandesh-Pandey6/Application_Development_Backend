@@ -1,20 +1,18 @@
-namespace Autopartspro.Application.Dtos.Admin;
+namespace Autopartspro.Application.Dtos.Staff;
 
-public class AdminProfileDto
+public class StaffProfileDto
 {
     public Guid Id { get; set; }
     public string FullName { get; set; } = string.Empty;
     public string Email { get; set; } = string.Empty;
-    public string? BusinessEmail { get; set; }
     public string PhoneNumber { get; set; } = string.Empty;
     public string City { get; set; } = string.Empty;
     public string? ProfileImageUrl { get; set; }
 }
 
-public class UpdateAdminProfileDto
+public class UpdateStaffProfileDto
 {
     public string? FullName { get; set; }
-    public string? BusinessEmail { get; set; }
     public string? PhoneNumber { get; set; }
     public string? City { get; set; }
 }

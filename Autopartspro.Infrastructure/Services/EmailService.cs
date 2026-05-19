@@ -255,19 +255,65 @@ namespace Autopartspro.Infrastructure.Services
             await SendEmailAsync(toEmail, subject, body);
         }
 
-        public async Task SendCreditReminderEmailAsync(string toEmail,
-            string fullName, decimal overdueAmount)
-        {
-            var subject = "Payment Reminder - AutoPartsPro";
-            var body = $@"
-            <!DOCTYPE html>
-            <html>
-            <body style='font-family: Arial, sans-serif;'>
-                <p>Hi <strong>{fullName}</strong>, you have an overdue balance of <strong>Rs. {overdueAmount:N2}</strong>.</p>
-            </body>
-            </html>";
+        public Task SendCreditReminderEmailAsync(string toEmail, string fullName, decimal overdueAmount) =>
+            SendOverdueInvoiceReminderEmailAsync(
+                toEmail,
+                fullName,
+                "your account",
+                overdueAmount,
+                DateTime.UtcNow,
+                3,
+                3,
+                null,
+                null);
 
-            await SendEmailAsync(toEmail, subject, body);
+        public async Task SendOverdueInvoiceReminderEmailAsync(
+            string toEmail,
+            string customerName,
+            string invoiceNumber,
+            decimal amount,
+            DateTime saleDate,
+            int overdueAfterDays,
+            int daysSinceSale,
+            string? staffReplyToEmail,
+            string? staffReplyToName)
+        {
+            var subject = $"Overdue payment — {invoiceNumber} - AutoPartsPro";
+            var saleDateLabel = saleDate.ToString("dd MMM yyyy");
+            var staffLabel = string.IsNullOrWhiteSpace(staffReplyToName)
+                ? "our team"
+                : System.Net.WebUtility.HtmlEncode(staffReplyToName);
+
+            var body = $@"
+<!DOCTYPE html>
+<html>
+<body style='font-family: Arial, sans-serif; max-width: 640px; color: #1e293b;'>
+  <p>Dear <strong>{System.Net.WebUtility.HtmlEncode(customerName)}</strong>,</p>
+  <p>This is a reminder that your purchase invoice is <strong>overdue</strong>.</p>
+  <table style='border-collapse: collapse; width: 100%; margin: 16px 0;' cellpadding='8'>
+    <tr>
+      <td style='border:1px solid #e2e8f0;'><strong>Invoice</strong></td>
+      <td style='border:1px solid #e2e8f0;'>{System.Net.WebUtility.HtmlEncode(invoiceNumber)}</td>
+    </tr>
+    <tr>
+      <td style='border:1px solid #e2e8f0;'><strong>Amount due</strong></td>
+      <td style='border:1px solid #e2e8f0;'>Rs. {amount:N2}</td>
+    </tr>
+    <tr>
+      <td style='border:1px solid #e2e8f0;'><strong>Purchase date</strong></td>
+      <td style='border:1px solid #e2e8f0;'>{saleDateLabel}</td>
+    </tr>
+    <tr>
+      <td style='border:1px solid #e2e8f0;'><strong>Status</strong></td>
+      <td style='border:1px solid #e2e8f0;'>Unpaid for more than {overdueAfterDays} day(s) ({daysSinceSale} days since purchase)</td>
+    </tr>
+  </table>
+  <p>Please arrange payment at your earliest convenience. You can reply to this email to contact {staffLabel}.</p>
+  <p>Thank you,<br/><strong>AutoPartsPro</strong></p>
+</body>
+</html>";
+
+            await SendEmailAsync(toEmail, subject, body, staffReplyToEmail, staffReplyToName);
         }
     }
 }

@@ -27,6 +27,9 @@ namespace Autopartspro.Application.Dtos.Admin
 
         public int Quantity { get; set; }
         public decimal UnitPrice { get; set; }
+
+        /// <summary>Optional description when auto-creating a part from a part request.</summary>
+        public string? Description { get; set; }
     }
 
     public class PurchaseInvoiceResponseDto

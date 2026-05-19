@@ -33,6 +33,10 @@ namespace Autopartspro.Application.Interfaces
 
         // Financial Reports
         Task<FinancialReportDto> GetFinancialReportAsync(string period, DateTime? date);
+        Task<byte[]> GetFinancialReportPdfAsync(string period, DateTime? date);
+        Task<UnpaidSalesInvoicesSummaryDto> GetUnpaidSalesInvoicesAsync(string? filter);
+        Task<string> MarkSalesInvoicePaidAsync(Guid invoiceId);
+        Task<byte[]> GetSalesInvoicePdfAsync(Guid invoiceId);
 
         // Inventory Reports
         Task<InventoryReportDto> GetInventoryReportAsync();

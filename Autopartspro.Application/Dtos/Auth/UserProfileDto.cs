@@ -11,6 +11,7 @@ namespace Autopartspro.Application.Dtos.Auth
         public string Status { get; set; } = string.Empty;
         public bool IsEmailVerified { get; set; }
         public bool MustChangePassword { get; set; }
+        public string? ProfileImageUrl { get; set; }
 
         // Customer only
         public List<VehicleDto> Vehicles { get; set; } = new();

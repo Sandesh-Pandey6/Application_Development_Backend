@@ -1,6 +1,7 @@
 using Autopartspro.Application.Dtos;
 using Autopartspro.Application.Interfaces;
 using Autopartspro.Domain.Entities;
+using Autopartspro.Infrastructure;
 using Autopartspro.Infrastructure.Data;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -13,21 +14,17 @@ namespace Autopartspro.Controllers;
 [Authorize(Roles = "Admin,Staff")]
 public class PartsController : ControllerBase
 {
-    private static readonly HashSet<string> AllowedImageTypes = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "image/jpeg", "image/jpg", "image/png", "image/webp", "image/gif",
-    };
-
-    private const long MaxImageBytes = 5 * 1024 * 1024;
-
     private readonly AppDbContext _db;
-    private readonly IWebHostEnvironment _env;
+    private readonly IImageStorageService _images;
     private readonly IUserNotificationService _notifications;
 
-    public PartsController(AppDbContext db, IWebHostEnvironment env, IUserNotificationService notifications)
+    public PartsController(
+        AppDbContext db,
+        IImageStorageService images,
+        IUserNotificationService notifications)
     {
         _db = db;
-        _env = env;
+        _images = images;
         _notifications = notifications;
     }
 
@@ -126,44 +123,33 @@ public class PartsController : ControllerBase
     }
 
     [HttpPost("{id:guid}/image")]
-    [RequestSizeLimit(MaxImageBytes)]
+    [RequestSizeLimit(ImageUploadRules.MaxBytes)]
     public async Task<ActionResult<PartDto>> UploadImage(Guid id, IFormFile? file)
     {
-        if (file is null || file.Length == 0)
-            return BadRequest(new { message = "Choose an image file to upload." });
-
-        if (file.Length > MaxImageBytes)
-            return BadRequest(new { message = "Image must be 5 MB or smaller." });
-
-        if (!AllowedImageTypes.Contains(file.ContentType))
-            return BadRequest(new { message = "Use JPEG, PNG, WebP, or GIF." });
+        try
+        {
+            ImageUploadRules.Validate(file);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
 
         var p = await _db.Parts.Include(x => x.Vendor).FirstOrDefaultAsync(x => x.Id == id);
         if (p is null) return NotFound();
 
-        var ext = Path.GetExtension(file.FileName);
-        if (string.IsNullOrWhiteSpace(ext) || ext.Length > 6)
-            ext = file.ContentType switch
-            {
-                "image/png" => ".png",
-                "image/webp" => ".webp",
-                "image/gif" => ".gif",
-                _ => ".jpg",
-            };
+        await _images.DeleteAsync(p.ImageUrl, p.ImagePublicId);
 
-        var uploadsDir = GetUploadsDirectory();
-        Directory.CreateDirectory(uploadsDir);
+        await using var stream = file!.OpenReadStream();
+        var upload = await _images.UploadAsync(new ImageUploadRequest(
+            stream,
+            file.FileName,
+            file.ContentType,
+            "parts",
+            id.ToString("N")));
 
-        await DeleteStoredImageAsync(p.ImageUrl);
-
-        var fileName = $"{id:N}{ext.ToLowerInvariant()}";
-        var physicalPath = Path.Combine(uploadsDir, fileName);
-        await using (var stream = new FileStream(physicalPath, FileMode.Create))
-        {
-            await file.CopyToAsync(stream);
-        }
-
-        p.ImageUrl = $"/uploads/parts/{fileName}";
+        p.ImageUrl = upload.Url;
+        p.ImagePublicId = upload.PublicId;
         p.UpdatedAt = DateTime.UtcNow;
         await _db.SaveChangesAsync();
 
@@ -176,8 +162,9 @@ public class PartsController : ControllerBase
         var p = await _db.Parts.Include(x => x.Vendor).FirstOrDefaultAsync(x => x.Id == id);
         if (p is null) return NotFound();
 
-        await DeleteStoredImageAsync(p.ImageUrl);
+        await _images.DeleteAsync(p.ImageUrl, p.ImagePublicId);
         p.ImageUrl = null;
+        p.ImagePublicId = null;
         p.UpdatedAt = DateTime.UtcNow;
         await _db.SaveChangesAsync();
 
@@ -194,41 +181,10 @@ public class PartsController : ControllerBase
         if (sold)
             return Conflict(new { message = "Part has been sold and cannot be deleted." });
 
-        await DeleteStoredImageAsync(p.ImageUrl);
+        await _images.DeleteAsync(p.ImageUrl, p.ImagePublicId);
         _db.Parts.Remove(p);
         await _db.SaveChangesAsync();
         return NoContent();
-    }
-
-    private string GetUploadsDirectory()
-    {
-        var webRoot = _env.WebRootPath;
-        if (string.IsNullOrWhiteSpace(webRoot))
-            webRoot = Path.Combine(_env.ContentRootPath, "wwwroot");
-        return Path.Combine(webRoot, "uploads", "parts");
-    }
-
-    private async Task DeleteStoredImageAsync(string? imageUrl)
-    {
-        if (string.IsNullOrWhiteSpace(imageUrl))
-            return;
-
-        var fileName = Path.GetFileName(imageUrl);
-        if (string.IsNullOrWhiteSpace(fileName))
-            return;
-
-        var path = Path.Combine(GetUploadsDirectory(), fileName);
-        if (System.IO.File.Exists(path))
-        {
-            try
-            {
-                await Task.Run(() => System.IO.File.Delete(path));
-            }
-            catch
-            {
-                // ignore cleanup failures
-            }
-        }
     }
 
     private static string? NormalizeImageUrl(string? url)

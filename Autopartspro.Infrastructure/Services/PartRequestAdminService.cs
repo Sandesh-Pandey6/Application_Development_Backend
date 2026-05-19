@@ -108,6 +108,7 @@ public class PartRequestAdminService : IPartRequestAdminService
                     new PurchaseInvoiceItemDto
                     {
                         ProductName = request.PartName,
+                        Description = request.PartDescription,
                         Quantity = dto.Quantity,
                         UnitPrice = dto.UnitPrice,
                     },
@@ -150,15 +151,9 @@ public class PartRequestAdminService : IPartRequestAdminService
         if (request.Status is PartRequestStatus.Rejected or PartRequestStatus.InvoiceRecorded)
             throw new ArgumentException("This request is closed.");
 
-        if (request.Status is not (
-            PartRequestStatus.EscalatedToAdmin or
-            PartRequestStatus.Approved or
-            PartRequestStatus.VendorRequested))
+        if (request.Status is not (PartRequestStatus.EscalatedToAdmin or PartRequestStatus.Approved))
             throw new ArgumentException(
                 "Only escalated or accepted requests can be sent to a vendor. Accept the request or wait for staff escalation.");
-
-        if (request.Status == PartRequestStatus.VendorRequested)
-            throw new ArgumentException("Vendor was already contacted. Record the invoice when the supplier replies.");
     }
 
     private static void EnsureCanRecordInvoice(PartRequest request)
@@ -169,12 +164,9 @@ public class PartRequestAdminService : IPartRequestAdminService
         if (request.Status == PartRequestStatus.InvoiceRecorded)
             throw new ArgumentException("A vendor invoice is already recorded for this request.");
 
-        if (request.Status is not (
-            PartRequestStatus.VendorRequested or
-            PartRequestStatus.Approved or
-            PartRequestStatus.EscalatedToAdmin))
+        if (request.Status != PartRequestStatus.VendorRequested)
             throw new ArgumentException(
-                "Record the vendor invoice after the part is accepted or the vendor has been emailed.");
+                "Email the vendor first, then record the invoice when the supplier replies.");
     }
 
     private static string BuildVendorEmailBody(

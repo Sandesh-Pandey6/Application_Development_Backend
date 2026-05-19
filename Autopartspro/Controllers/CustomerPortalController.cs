@@ -4,6 +4,7 @@ using Autopartspro.Application.Dtos.Customer;
 using Autopartspro.Application.Interfaces;
 using Autopartspro.Domain.Entities;
 using Autopartspro.Domain.Enums;
+using Autopartspro.Infrastructure;
 using Autopartspro.Infrastructure.Data;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -21,6 +22,7 @@ public class CustomerPortalController : ControllerBase
     private readonly IUserNotificationService _notifications;
     private readonly IAppointmentSchedulingService _scheduling;
     private readonly IUserPasswordService _passwords;
+    private readonly IUserProfileImageService _profileImages;
     private readonly AppDbContext _db;
 
     public CustomerPortalController(
@@ -29,6 +31,7 @@ public class CustomerPortalController : ControllerBase
         IUserNotificationService notifications,
         IAppointmentSchedulingService scheduling,
         IUserPasswordService passwords,
+        IUserProfileImageService profileImages,
         AppDbContext db)
     {
         _customerService = customerService;
@@ -36,6 +39,7 @@ public class CustomerPortalController : ControllerBase
         _notifications = notifications;
         _scheduling = scheduling;
         _passwords = passwords;
+        _profileImages = profileImages;
         _db = db;
     }
 
@@ -85,6 +89,45 @@ public class CustomerPortalController : ControllerBase
         catch (ArgumentException ex)
         {
             return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpPost("me/photo")]
+    [RequestSizeLimit(ImageUploadRules.MaxBytes)]
+    public async Task<IActionResult> UploadProfilePhoto(IFormFile? file)
+    {
+        var userId = GetUserId();
+        if (userId == null) return UnauthorizedSession();
+        try
+        {
+            ImageUploadRules.Validate(file);
+            await using var stream = file!.OpenReadStream();
+            await _profileImages.UploadAsync(userId.Value, stream, file.FileName, file.ContentType);
+            return Ok(await _customerService.GetProfileAsync(userId.Value));
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+    }
+
+    [HttpDelete("me/photo")]
+    public async Task<IActionResult> DeleteProfilePhoto()
+    {
+        var userId = GetUserId();
+        if (userId == null) return UnauthorizedSession();
+        try
+        {
+            await _profileImages.RemoveAsync(userId.Value);
+            return Ok(await _customerService.GetProfileAsync(userId.Value));
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
         }
     }
 

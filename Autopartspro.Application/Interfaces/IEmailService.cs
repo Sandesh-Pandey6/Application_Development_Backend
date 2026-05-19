@@ -11,5 +11,16 @@ namespace Autopartspro.Application.Interfaces
         Task SendInvoiceEmailAsync(string toEmail, string fullName, string invoiceNumber, byte[] invoicePdf);
         Task SendLowStockAlertEmailAsync(string toEmail, string partName, int currentStock);
         Task SendCreditReminderEmailAsync(string toEmail, string fullName, decimal overdueAmount);
+
+        Task SendOverdueInvoiceReminderEmailAsync(
+            string toEmail,
+            string customerName,
+            string invoiceNumber,
+            decimal amount,
+            DateTime saleDate,
+            int overdueAfterDays,
+            int daysSinceSale,
+            string? staffReplyToEmail,
+            string? staffReplyToName);
     }
 }

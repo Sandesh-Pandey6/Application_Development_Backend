@@ -511,9 +511,7 @@ public class PartRequestsController : ControllerBase
 
         canRequestVendor = IsAdmin && p.Status is PartRequestStatus.EscalatedToAdmin or PartRequestStatus.Approved,
 
-        canRecordVendorInvoice = IsAdmin && p.Status is PartRequestStatus.VendorRequested
-            or PartRequestStatus.EscalatedToAdmin
-            or PartRequestStatus.Approved,
+        canRecordVendorInvoice = IsAdmin && p.Status == PartRequestStatus.VendorRequested,
 
     };
 

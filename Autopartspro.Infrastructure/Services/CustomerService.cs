@@ -36,6 +36,7 @@ namespace Autopartspro.Infrastructure.Services
                 Status = user.Status.ToString(),
                 IsEmailVerified = user.IsEmailVerified,
                 MustChangePassword = user.MustChangePassword,
+                ProfileImageUrl = user.ProfileImageUrl,
                 Vehicles = user.Vehicles.Select(v => new VehicleDto
                 {
                     Id = v.Id,

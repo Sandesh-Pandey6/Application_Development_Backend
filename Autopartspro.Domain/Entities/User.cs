@@ -16,6 +16,10 @@ namespace Autopartspro.Domain.Entities
         public bool IsEmailVerified { get; set; } = false;
         /// <summary>True when staff registered the account with a temporary default password.</summary>
         public bool MustChangePassword { get; set; }
+        /// <summary>Profile photo URL (Cloudinary or local /uploads).</summary>
+        public string? ProfileImageUrl { get; set; }
+        /// <summary>Cloudinary public id for profile photo deletion.</summary>
+        public string? ProfileImagePublicId { get; set; }
 
         // Navigation Properties
         public ICollection<Vehicle> Vehicles { get; set; } = new List<Vehicle>();

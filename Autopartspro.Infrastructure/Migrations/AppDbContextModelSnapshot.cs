@@ -151,6 +151,9 @@ namespace Autopartspro.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<string>("ImagePublicId")
+                        .HasColumnType("text");
+
                     b.Property<string>("ImageUrl")
                         .HasColumnType("text");
 
@@ -394,6 +397,9 @@ namespace Autopartspro.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<DateTime?>("OverdueReminderSentAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<int>("PaymentStatus")
                         .HasColumnType("integer");
 
@@ -537,6 +543,12 @@ namespace Autopartspro.Infrastructure.Migrations
 
                     b.Property<string>("PhoneNumber")
                         .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("ProfileImagePublicId")
+                        .HasColumnType("text");
+
+                    b.Property<string>("ProfileImageUrl")
                         .HasColumnType("text");
 
                     b.Property<int>("Role")

@@ -28,6 +28,13 @@ public static class DatabaseSchemaPatches
             ALTER TABLE "PartRequests" ADD COLUMN IF NOT EXISTS "VendorRequestMessage" text;
             ALTER TABLE "PartRequests" ADD COLUMN IF NOT EXISTS "PurchaseInvoiceId" uuid;
             ALTER TABLE "PartRequests" ADD COLUMN IF NOT EXISTS "InvoiceRecordedAt" timestamp with time zone;
+
+            ALTER TABLE "SalesInvoices" ADD COLUMN IF NOT EXISTS "OverdueReminderSentAt" timestamp with time zone;
+
+            ALTER TABLE "Users" ADD COLUMN IF NOT EXISTS "ProfileImageUrl" text;
+            ALTER TABLE "Users" ADD COLUMN IF NOT EXISTS "ProfileImagePublicId" text;
+
+            ALTER TABLE "Parts" ADD COLUMN IF NOT EXISTS "ImagePublicId" text;
             """,
             ct);
     }

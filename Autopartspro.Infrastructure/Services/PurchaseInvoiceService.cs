@@ -100,6 +100,8 @@ public class PurchaseInvoiceService : IPurchaseInvoiceService
 
                 part.StockQuantity += item.Quantity;
                 part.UpdatedAt = DateTime.UtcNow;
+
+                await _notifications.NotifyLowStockAsync(part.PartName, part.StockQuantity);
             }
 
             invoice.TotalAmount = totalAmount;
@@ -210,7 +212,9 @@ public class PurchaseInvoiceService : IPurchaseInvoiceService
             Price = item.UnitPrice,
             StockQuantity = 0,
             Category = string.Empty,
-            Description = string.Empty,
+            Description = string.IsNullOrWhiteSpace(item.Description)
+                ? string.Empty
+                : item.Description.Trim(),
         };
         _context.Parts.Add(part);
         return part;

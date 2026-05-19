@@ -4,6 +4,7 @@ using Autopartspro.Domain.Entities;
 using Autopartspro.Domain.Enums;
 using Autopartspro.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 
 namespace Autopartspro.Infrastructure.Services
 {
@@ -13,18 +14,24 @@ namespace Autopartspro.Infrastructure.Services
         private readonly IEmailService _emailService;
         private readonly IPurchaseInvoiceService _purchaseInvoices;
         private readonly IUserNotificationService _notifications;
+        private readonly ISalesInvoiceService _salesInvoices;
+        private readonly IConfiguration _config;
         private const int LowStockThreshold = 10;
 
         public AdminService(
             AppDbContext context,
             IEmailService emailService,
             IPurchaseInvoiceService purchaseInvoices,
-            IUserNotificationService notifications)
+            IUserNotificationService notifications,
+            ISalesInvoiceService salesInvoices,
+            IConfiguration config)
         {
             _context = context;
             _emailService = emailService;
             _purchaseInvoices = purchaseInvoices;
             _notifications = notifications;
+            _salesInvoices = salesInvoices;
+            _config = config;
         }
 
         
@@ -667,6 +674,92 @@ namespace Autopartspro.Infrastructure.Services
                 VendorSpend = vendorSpend
             };
         }
+
+        public async Task<byte[]> GetFinancialReportPdfAsync(string period, DateTime? date)
+        {
+            var report = await GetFinancialReportAsync(period, date);
+            var now = UtcDate.EnsureUtc(date ?? DateTime.UtcNow);
+            var (periodLabel, periodRange) = FormatFinancialPeriod(period, now);
+            return FinancialReportPdfGenerator.Build(report, periodLabel, periodRange);
+        }
+
+        private static (string Label, string Range) FormatFinancialPeriod(string period, DateTime now)
+        {
+            return period.ToLower() switch
+            {
+                "daily" => ("Daily", UtcDate.StartOfDay(now).ToString("dd MMM yyyy")),
+                "yearly" => ("Yearly", UtcDate.StartOfYear(now).Year.ToString()),
+                _ => ("Monthly", UtcDate.StartOfMonth(now).ToString("MMMM yyyy")),
+            };
+        }
+
+        public async Task<UnpaidSalesInvoicesSummaryDto> GetUnpaidSalesInvoicesAsync(string? filter)
+        {
+            var overdueDays = Math.Max(1, _config.GetValue("PaymentReminders:OverdueDays", 3));
+            var cutoff = DateTime.UtcNow.AddDays(-overdueDays);
+            var overdueOnly = string.Equals(filter, "overdue", StringComparison.OrdinalIgnoreCase);
+
+            var rows = await _context.SalesInvoices
+                .AsNoTracking()
+                .Include(s => s.Customer)
+                .Include(s => s.Staff)
+                .Where(s => s.PaymentStatus == PaymentStatus.Unpaid)
+                .OrderByDescending(s => s.SaleDate)
+                .ToListAsync();
+
+            var now = DateTime.UtcNow;
+            var mapped = rows.Select(s =>
+            {
+                var days = (int)Math.Floor((now - s.SaleDate).TotalDays);
+                var isOverdue = s.SaleDate <= cutoff;
+                return new UnpaidSalesInvoiceDto
+                {
+                    Id = s.Id,
+                    InvoiceNumber = s.InvoiceNumber,
+                    CustomerId = s.CustomerId,
+                    CustomerName = s.Customer?.FullName ?? "",
+                    CustomerPhone = s.Customer?.PhoneNumber,
+                    CustomerEmail = s.Customer?.Email,
+                    StaffName = s.Staff?.FullName,
+                    SaleDate = s.SaleDate,
+                    TotalAmount = s.TotalAmount,
+                    DaysSinceSale = days,
+                    IsOverdue = isOverdue,
+                    ReminderSent = s.OverdueReminderSentAt.HasValue,
+                    OverdueReminderSentAt = s.OverdueReminderSentAt,
+                };
+            }).ToList();
+
+            if (overdueOnly)
+                mapped = mapped.Where(i => i.IsOverdue).ToList();
+
+            return new UnpaidSalesInvoicesSummaryDto
+            {
+                OverdueDaysThreshold = overdueDays,
+                TotalUnpaid = rows.Count,
+                OverdueCount = rows.Count(s => s.SaleDate <= cutoff),
+                TotalOutstanding = rows.Sum(s => s.TotalAmount),
+                OverdueOutstanding = rows.Where(s => s.SaleDate <= cutoff).Sum(s => s.TotalAmount),
+                Invoices = mapped,
+            };
+        }
+
+        public async Task<string> MarkSalesInvoicePaidAsync(Guid invoiceId)
+        {
+            var invoice = await _context.SalesInvoices.FindAsync(invoiceId)
+                ?? throw new KeyNotFoundException("Sales invoice not found.");
+
+            if (invoice.PaymentStatus == PaymentStatus.Paid)
+                return "Invoice is already marked as paid.";
+
+            invoice.PaymentStatus = PaymentStatus.Paid;
+            invoice.UpdatedAt = DateTime.UtcNow;
+            await _context.SaveChangesAsync();
+            return "Invoice marked as paid.";
+        }
+
+        public Task<byte[]> GetSalesInvoicePdfAsync(Guid invoiceId) =>
+            _salesInvoices.GetInvoicePdfBytesAsync(invoiceId);
 
         
         // INVENTORY REPORTS
