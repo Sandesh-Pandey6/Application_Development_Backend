@@ -30,6 +30,7 @@ public class CustomerCheckoutDto
 {
     public List<CustomerCheckoutItemDto> Items { get; set; } = new();
     public string PaymentStatus { get; set; } = "Paid";
+    public Guid? VehicleId { get; set; }
 }
 
 public class CustomerCheckoutItemDto

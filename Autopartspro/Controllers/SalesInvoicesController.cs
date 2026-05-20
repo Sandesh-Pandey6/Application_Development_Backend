@@ -4,6 +4,7 @@ using Autopartspro.Application.Interfaces;
 using Autopartspro.Domain.Entities;
 using Autopartspro.Domain.Enums;
 using Autopartspro.Infrastructure.Data;
+using Autopartspro.Infrastructure.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -36,6 +37,7 @@ public class SalesInvoicesController : ControllerBase
     {
         var q = _db.SalesInvoices.AsNoTracking()
             .Include(s => s.Customer)
+            .Include(s => s.Vehicle)
             .Include(s => s.Staff)
             .Include(s => s.Items)
             .ThenInclude(i => i.Part)
@@ -61,6 +63,7 @@ public class SalesInvoicesController : ControllerBase
     {
         var s = await _db.SalesInvoices.AsNoTracking()
             .Include(s => s.Customer)
+            .Include(s => s.Vehicle)
             .Include(s => s.Staff)
             .Include(s => s.Items)
             .ThenInclude(i => i.Part)
@@ -103,6 +106,10 @@ public class SalesInvoicesController : ControllerBase
 
         var paymentStatus = MapPaymentStatus(dto.PaymentStatus);
 
+        var vehicleId = await ResolveVehicleIdAsync(dto.CustomerId, dto.VehicleId);
+        if (dto.VehicleId.HasValue && !vehicleId.HasValue)
+            return BadRequest(new { message = "Vehicle not found for this customer." });
+
         var staffUser = await ResolveStaffUserAsync();
         if (staffUser is null)
             return BadRequest(new { message = "Could not identify the staff member recording this sale." });
@@ -133,6 +140,7 @@ public class SalesInvoicesController : ControllerBase
         {
             InvoiceNumber = await GenerateInvoiceNumberAsync(),
             CustomerId = dto.CustomerId,
+            VehicleId = vehicleId,
             StaffId = staffUser!.Id,
             SaleDate = DateTime.UtcNow,
             PaymentStatus = paymentStatus,
@@ -171,6 +179,8 @@ public class SalesInvoicesController : ControllerBase
         await tx.CommitAsync();
 
         await _db.Entry(invoice).Reference(x => x.Customer).LoadAsync();
+        if (invoice.VehicleId.HasValue)
+            await _db.Entry(invoice).Reference(x => x.Vehicle).LoadAsync();
         await _db.Entry(invoice).Reference(x => x.Staff).LoadAsync();
         foreach (var line in invoice.Items)
             await _db.Entry(line).Reference(x => x.Part).LoadAsync();
@@ -225,6 +235,22 @@ public class SalesInvoicesController : ControllerBase
         };
     }
 
+    private async Task<Guid?> ResolveVehicleIdAsync(Guid customerId, Guid? requestedVehicleId)
+    {
+        if (requestedVehicleId.HasValue)
+        {
+            var match = await _db.Vehicles.AsNoTracking()
+                .AnyAsync(v => v.Id == requestedVehicleId.Value && v.CustomerId == customerId);
+            return match ? requestedVehicleId : null;
+        }
+
+        var vehicles = await _db.Vehicles.AsNoTracking()
+            .Where(v => v.CustomerId == customerId)
+            .Select(v => v.Id)
+            .ToListAsync();
+        return vehicles.Count == 1 ? vehicles[0] : null;
+    }
+
     private static InvoiceDto MapInvoice(SalesInvoice s) => new(
         s.Id,
         s.InvoiceNumber,
@@ -237,5 +263,8 @@ public class SalesInvoicesController : ControllerBase
         s.TotalAmount,
         s.PaymentStatus.ToString(),
         s.Items.Select(i => new InvoiceItemDto(
-            i.Id, i.PartId, i.Part?.PartName, i.Quantity, i.UnitPrice, i.SubTotal)).ToList());
+            i.Id, i.PartId, i.Part?.PartName, i.Quantity, i.UnitPrice, i.SubTotal)).ToList(),
+        s.VehicleId,
+        VehicleDisplayHelper.FormatNumberPlate(s.Vehicle),
+        VehicleDisplayHelper.FormatFull(s.Vehicle));
 }

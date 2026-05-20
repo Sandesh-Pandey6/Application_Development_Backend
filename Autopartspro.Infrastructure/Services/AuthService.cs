@@ -52,6 +52,12 @@ namespace Autopartspro.Infrastructure.Services
 
             if (role == RoleType.Customer)
             {
+                if (string.IsNullOrWhiteSpace(dto.Make) || string.IsNullOrWhiteSpace(dto.Model))
+                    throw new ArgumentException("Vehicle make and model are required.");
+
+                if (!dto.Year.HasValue || dto.Year.Value < 1980 || dto.Year.Value > DateTime.UtcNow.Year + 1)
+                    throw new ArgumentException("Enter a valid vehicle year.");
+
                 if (string.IsNullOrWhiteSpace(dto.NumberPlate))
                     throw new ArgumentException("Vehicle number plate is required.");
 
@@ -102,9 +108,9 @@ namespace Autopartspro.Infrastructure.Services
                 _context.Vehicles.Add(new Vehicle
                 {
                     CustomerId = user.Id,
-                    Make = dto.Make?.Trim() ?? string.Empty,
-                    Model = dto.Model?.Trim() ?? string.Empty,
-                    Year = dto.Year ?? 0,
+                    Make = dto.Make!.Trim(),
+                    Model = dto.Model!.Trim(),
+                    Year = dto.Year!.Value,
                     FuelType = fuelType,
                     NumberPlate = dto.NumberPlate!.Trim()
                 });

@@ -22,7 +22,10 @@ public record InvoiceDto(
     decimal DiscountAmount,
     decimal TotalAmount,
     string PaymentStatus,
-    List<InvoiceItemDto> Items
+    List<InvoiceItemDto> Items,
+    Guid? VehicleId = null,
+    string? VehicleNumber = null,
+    string? VehicleDescription = null
 );
 
 public class InvoiceItemCreateDto

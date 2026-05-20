@@ -90,6 +90,13 @@ namespace Autopartspro.Infrastructure.Data
                 .HasForeignKey(s => s.StaffId)
                 .OnDelete(DeleteBehavior.Restrict);
 
+            //  SalesInvoice → Vehicle (optional)
+            modelBuilder.Entity<SalesInvoice>()
+                .HasOne(s => s.Vehicle)
+                .WithMany(v => v.SalesInvoices)
+                .HasForeignKey(s => s.VehicleId)
+                .OnDelete(DeleteBehavior.SetNull);
+
             //  PurchaseInvoice → Admin
             modelBuilder.Entity<PurchaseInvoice>()
                 .HasOne(p => p.Admin)

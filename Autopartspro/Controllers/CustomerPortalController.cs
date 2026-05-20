@@ -6,6 +6,7 @@ using Autopartspro.Domain.Entities;
 using Autopartspro.Domain.Enums;
 using Autopartspro.Infrastructure;
 using Autopartspro.Infrastructure.Data;
+using Autopartspro.Infrastructure.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -608,12 +609,17 @@ public class CustomerPortalController : ControllerBase
         const decimal loyaltyThreshold = 5000m;
         const decimal loyaltyRate = 0.10m;
 
+        var vehicleId = await ResolveCustomerVehicleIdAsync(userId.Value, dto.VehicleId);
+        if (dto.VehicleId.HasValue && !vehicleId.HasValue)
+            return BadRequest(new { message = "Vehicle not found on your account." });
+
         await using var tx = await _db.Database.BeginTransactionAsync();
 
         var invoice = new SalesInvoice
         {
             InvoiceNumber = await GenerateCustomerInvoiceNumberAsync(),
             CustomerId = userId.Value,
+            VehicleId = vehicleId,
             StaffId = staffUser.Id,
             SaleDate = DateTime.UtcNow,
             PaymentStatus = MapCustomerPaymentStatus(dto.PaymentStatus),
@@ -650,6 +656,8 @@ public class CustomerPortalController : ControllerBase
         await tx.CommitAsync();
 
         await _db.Entry(invoice).Reference(x => x.Customer).LoadAsync();
+        if (invoice.VehicleId.HasValue)
+            await _db.Entry(invoice).Reference(x => x.Vehicle).LoadAsync();
         foreach (var line in invoice.Items)
             await _db.Entry(line).Reference(x => x.Part).LoadAsync();
 
@@ -673,6 +681,7 @@ public class CustomerPortalController : ControllerBase
         if (userId == null) return UnauthorizedSession();
 
         var invoices = await _db.SalesInvoices
+            .Include(s => s.Vehicle)
             .Include(s => s.Items)
             .ThenInclude(i => i.Part)
             .Where(s => s.CustomerId == userId.Value)
@@ -712,6 +721,22 @@ public class CustomerPortalController : ControllerBase
         {
             return NotFound(new { message = "Invoice not found." });
         }
+    }
+
+    private async Task<Guid?> ResolveCustomerVehicleIdAsync(Guid customerId, Guid? requestedVehicleId)
+    {
+        if (requestedVehicleId.HasValue)
+        {
+            var exists = await _db.Vehicles.AsNoTracking()
+                .AnyAsync(v => v.Id == requestedVehicleId.Value && v.CustomerId == customerId);
+            return exists ? requestedVehicleId : null;
+        }
+
+        var vehicleIds = await _db.Vehicles.AsNoTracking()
+            .Where(v => v.CustomerId == customerId)
+            .Select(v => v.Id)
+            .ToListAsync();
+        return vehicleIds.Count == 1 ? vehicleIds[0] : null;
     }
 
     private Guid? GetUserId()
@@ -836,6 +861,9 @@ public class CustomerPortalController : ControllerBase
             id = s.InvoiceNumber,
             invoiceId = s.Id.ToString(),
             date = s.SaleDate,
+            vehicleId = s.VehicleId?.ToString(),
+            vehicleNumber = VehicleDisplayHelper.FormatNumberPlate(s.Vehicle),
+            vehicle = VehicleDisplayHelper.FormatFull(s.Vehicle),
             items = itemsLabel,
             parts = s.Items.Select(i => new
             {

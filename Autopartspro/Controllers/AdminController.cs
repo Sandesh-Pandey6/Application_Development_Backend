@@ -1,7 +1,9 @@
 using Autopartspro.Application.Dtos.Admin;
 using Autopartspro.Application.Interfaces;
 using Autopartspro.Infrastructure;
+using Autopartspro.Infrastructure.Data;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
 
@@ -15,15 +17,21 @@ namespace Autopartspro.Controllers
         private readonly IAdminService _adminService;
         private readonly IAdminProfileService _adminProfile;
         private readonly IUserProfileImageService _profileImages;
+        private readonly IOverduePaymentReminderService _overdueReminders;
+        private readonly IWebHostEnvironment _env;
 
         public AdminController(
             IAdminService adminService,
             IAdminProfileService adminProfile,
-            IUserProfileImageService profileImages)
+            IUserProfileImageService profileImages,
+            IOverduePaymentReminderService overdueReminders,
+            IWebHostEnvironment env)
         {
             _adminService = adminService;
             _adminProfile = adminProfile;
             _profileImages = profileImages;
+            _overdueReminders = overdueReminders;
+            _env = env;
         }
 
         private Guid GetAdminId() =>
@@ -192,6 +200,21 @@ namespace Autopartspro.Controllers
         {
             var message = await _adminService.MarkSalesInvoicePaidAsync(id);
             return Ok(new { message });
+        }
+
+        /// <summary>Development helper: run overdue payment reminders (email + in-app notification).</summary>
+        [HttpPost("process-overdue-reminders")]
+        public async Task<IActionResult> ProcessOverdueReminders(CancellationToken cancellationToken)
+        {
+            if (!_env.IsDevelopment())
+                return NotFound();
+
+            await _overdueReminders.ProcessDueRemindersAsync(cancellationToken);
+            return Ok(new
+            {
+                message = "Overdue reminder job completed. Check customer email and notifications.",
+                testInvoiceNumber = DevelopmentOverdueTestBootstrap.TestInvoiceNumber,
+            });
         }
 
         [HttpGet("sales-invoices/{id}/pdf")]

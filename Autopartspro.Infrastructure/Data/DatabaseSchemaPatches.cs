@@ -30,6 +30,7 @@ public static class DatabaseSchemaPatches
             ALTER TABLE "PartRequests" ADD COLUMN IF NOT EXISTS "InvoiceRecordedAt" timestamp with time zone;
 
             ALTER TABLE "SalesInvoices" ADD COLUMN IF NOT EXISTS "OverdueReminderSentAt" timestamp with time zone;
+            ALTER TABLE "SalesInvoices" ADD COLUMN IF NOT EXISTS "VehicleId" uuid;
 
             ALTER TABLE "Users" ADD COLUMN IF NOT EXISTS "ProfileImageUrl" text;
             ALTER TABLE "Users" ADD COLUMN IF NOT EXISTS "ProfileImagePublicId" text;

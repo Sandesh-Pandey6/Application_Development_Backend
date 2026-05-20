@@ -69,6 +69,9 @@ public static class InvoicePdfGenerator
                                 right.Item().Text($"Email: {invoice.Customer.Email}");
                             if (invoice.Staff != null && !string.IsNullOrWhiteSpace(invoice.Staff.FullName))
                                 right.Item().PaddingTop(6).Text($"Served by: {invoice.Staff.FullName}");
+                            var vehicleLine = VehicleDisplayHelper.FormatFull(invoice.Vehicle);
+                            if (!string.IsNullOrWhiteSpace(vehicleLine))
+                                right.Item().PaddingTop(6).Text($"Vehicle: {vehicleLine}");
                         });
                     });
 

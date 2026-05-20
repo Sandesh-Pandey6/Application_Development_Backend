@@ -420,6 +420,9 @@ namespace Autopartspro.Infrastructure.Migrations
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<Guid?>("VehicleId")
+                        .HasColumnType("uuid");
+
                     b.HasKey("Id");
 
                     b.HasIndex("CustomerId");
@@ -428,6 +431,8 @@ namespace Autopartspro.Infrastructure.Migrations
                         .IsUnique();
 
                     b.HasIndex("StaffId");
+
+                    b.HasIndex("VehicleId");
 
                     b.ToTable("SalesInvoices");
                 });
@@ -793,9 +798,16 @@ namespace Autopartspro.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("Autopartspro.Domain.Entities.Vehicle", "Vehicle")
+                        .WithMany("SalesInvoices")
+                        .HasForeignKey("VehicleId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.Navigation("Customer");
 
                     b.Navigation("Staff");
+
+                    b.Navigation("Vehicle");
                 });
 
             modelBuilder.Entity("Autopartspro.Domain.Entities.SalesInvoiceItem", b =>
@@ -837,6 +849,8 @@ namespace Autopartspro.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("Customer");
+
+                    b.Navigation("SalesInvoices");
                 });
 
             modelBuilder.Entity("Autopartspro.Domain.Entities.Appointment", b =>

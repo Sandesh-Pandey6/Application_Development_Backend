@@ -13,5 +13,6 @@ namespace Autopartspro.Domain.Entities
 
         // Navigation Properties
         public User Customer { get; set; } = null!;
+        public ICollection<SalesInvoice> SalesInvoices { get; set; } = new List<SalesInvoice>();
     }
 }

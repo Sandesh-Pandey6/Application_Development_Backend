@@ -58,6 +58,7 @@ namespace Autopartspro.Infrastructure.Services
         {
             var invoice = await _context.SalesInvoices
                 .Include(i => i.Customer)
+                .Include(i => i.Vehicle)
                 .Include(i => i.Staff)
                 .Include(i => i.Items)
                 .ThenInclude(x => x.Part)

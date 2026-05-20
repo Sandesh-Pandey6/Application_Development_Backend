@@ -2,6 +2,7 @@ using System.Text;
 using Autopartspro.API.Filters;
 using Autopartspro.API.Middleware;
 using Autopartspro.Application.Interfaces;
+using Autopartspro.Infrastructure;
 using Autopartspro.Infrastructure.Data;
 using Autopartspro.Infrastructure.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -88,6 +89,8 @@ builder.Services.AddScoped<IUserNotificationService, UserNotificationService>();
 builder.Services.AddScoped<IAppointmentSchedulingService, AppointmentSchedulingService>();
 builder.Services.AddScoped<IAdminService, AdminService>();
 builder.Services.AddScoped<IAdminProfileService, AdminProfileService>();
+builder.Services.AddScoped<IStaffProfileService, StaffProfileService>();
+builder.Services.AddImageStorage(builder.Configuration);
 builder.Services.AddScoped<IPartRequestAdminService, PartRequestAdminService>();
 builder.Services.AddScoped<IOverduePaymentReminderService, OverduePaymentReminderService>();
 builder.Services.AddHostedService<EmailReminderService>();
@@ -163,6 +166,19 @@ using (var scope = app.Services.CreateScope())
         scope.ServiceProvider.GetRequiredService<IConfiguration>(),
         app.Environment);
     await DevelopmentSampleDataBootstrap.EnsureAsync(db, app.Environment);
+    await DevelopmentOverdueTestBootstrap.EnsureAsync(
+        db,
+        scope.ServiceProvider.GetRequiredService<IConfiguration>(),
+        app.Environment);
+
+    if (app.Environment.IsDevelopment() &&
+        scope.ServiceProvider.GetRequiredService<IConfiguration>()
+            .GetValue("PaymentReminders:ProcessOnStartup", false))
+    {
+        var overdue = scope.ServiceProvider.GetRequiredService<IOverduePaymentReminderService>();
+        await overdue.ProcessDueRemindersAsync();
+        Console.WriteLine("PaymentReminders: processed overdue reminders on startup.");
+    }
 }
 
 app.Run();
