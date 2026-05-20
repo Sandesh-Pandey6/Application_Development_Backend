@@ -7,9 +7,9 @@ namespace Autopartspro.Domain.Enums
         EscalatedToAdmin,
         Approved,
         Rejected,
-        /// <summary>Admin emailed vendor to source the part.</summary>
+        /// Admin emailed vendor to source the part.
         VendorRequested,
-        /// <summary>Admin recorded the vendor purchase invoice.</summary>
+        /// Admin recorded the vendor purchase invoice.
         InvoiceRecorded,
     }
 }

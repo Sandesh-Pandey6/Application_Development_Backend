@@ -9,7 +9,7 @@ namespace Autopartspro.Domain.Entities
         public Guid AdminId { get; set; }
         public decimal TotalAmount { get; set; }
         public DateTime PurchaseDate { get; set; }
-        public PurchaseInvoiceStatus Status { get; set; } = PurchaseInvoiceStatus.Pending; // ← ADD THIS
+        public PurchaseInvoiceStatus Status { get; set; } = PurchaseInvoiceStatus.Pending; 
 
         // Navigation Properties
         public Vendor Vendor { get; set; } = null!;

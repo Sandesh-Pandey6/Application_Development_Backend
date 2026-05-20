@@ -6,9 +6,9 @@ using Microsoft.Extensions.Logging;
 
 namespace Autopartspro.Infrastructure.Services;
 
-/// <summary>
+
 /// Periodically checks for unpaid sales invoices past the due period and notifies customers.
-/// </summary>
+
 public class EmailReminderService : BackgroundService
 {
     private readonly IServiceScopeFactory _scopeFactory;

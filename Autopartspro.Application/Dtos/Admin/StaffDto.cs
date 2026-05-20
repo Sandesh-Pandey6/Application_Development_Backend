@@ -21,7 +21,7 @@ namespace Autopartspro.Application.Dtos.Admin
         public string Department { get; set; } = string.Empty;
         public string AccessLevel { get; set; } = string.Empty;
         public string BranchLocation { get; set; } = string.Empty;
-        /// <summary>When true, approves staff for login. When false, revokes approval.</summary>
+        /// When true, approves staff for login. When false, revokes approval.
         public bool? IsApprovedByAdmin { get; set; }
     }
 

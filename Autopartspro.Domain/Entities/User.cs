@@ -6,7 +6,7 @@ namespace Autopartspro.Domain.Entities
     {
         public string FullName { get; set; } = string.Empty;
         public string Email { get; set; } = string.Empty;
-        /// <summary>Public contact email for admin (e.g. customer inquiries). Separate from login email.</summary>
+        /// Public contact email for admin (e.g. customer inquiries). Separate from login email.
         public string? BusinessEmail { get; set; }
         public string PasswordHash { get; set; } = string.Empty;
         public string PhoneNumber { get; set; } = string.Empty;
@@ -14,9 +14,9 @@ namespace Autopartspro.Domain.Entities
         public RoleType Role { get; set; }
         public StatusType Status { get; set; } = StatusType.Active;
         public bool IsEmailVerified { get; set; } = false;
-        /// <summary>True when staff registered the account with a temporary default password.</summary>
+        /// True when staff registered the account with a temporary default password.
         public bool MustChangePassword { get; set; }
-        /// <summary>Profile photo URL (Cloudinary or local /uploads).</summary>
+        //Profile photo URL (Cloudinary or local /uploads).
         public string? ProfileImageUrl { get; set; }
         /// <summary>Cloudinary public id for profile photo deletion.</summary>
         public string? ProfileImagePublicId { get; set; }

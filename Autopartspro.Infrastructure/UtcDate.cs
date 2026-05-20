@@ -1,8 +1,8 @@
 namespace Autopartspro.Infrastructure;
 
-/// <summary>
-/// Helpers for PostgreSQL timestamptz — comparisons must use DateTimeKind.Utc.
-/// </summary>
+
+// Helpers for PostgreSQL timestamptz — comparisons must use DateTimeKind.Utc.
+
 internal static class UtcDate
 {
     public static DateTime EnsureUtc(DateTime value) =>

@@ -5,9 +5,8 @@ using Microsoft.Extensions.Hosting;
 
 namespace Autopartspro.Infrastructure.Data;
 
-/// <summary>
+
 /// Seeds minimal vendors and parts in Development when the catalog is empty.
-/// </summary>
 public static class DevelopmentSampleDataBootstrap
 {
     public static async Task EnsureAsync(AppDbContext db, IHostEnvironment env)

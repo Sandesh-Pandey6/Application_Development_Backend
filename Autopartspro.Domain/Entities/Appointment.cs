@@ -10,7 +10,7 @@ namespace Autopartspro.Domain.Entities
 		public TimeOnly PreferredTime { get; set; }
 		public string? Notes { get; set; }
 		public AppointmentStatus Status { get; set; } = AppointmentStatus.Pending;
-		/// <summary>Staff-proposed date when the requested slot is full.</summary>
+		/// Staff-proposed date when the requested slot is full.
 		public DateOnly? ProposedDate { get; set; }
 		public TimeOnly? ProposedTime { get; set; }
 		public string? StaffNotes { get; set; }

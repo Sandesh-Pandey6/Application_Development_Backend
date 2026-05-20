@@ -2,10 +2,10 @@ namespace Autopartspro.Application.Dtos.Admin
 {
     public class CreatePurchaseInvoiceDto
     {
-        /// <summary>Vendor's own invoice / bill number (required for admin entry).</summary>
+        /// Vendor's own invoice / bill number (required for admin entry).
         public string? VendorInvoiceNumber { get; set; }
 
-        /// <summary>Admin flows may pass an existing vendor id.</summary>
+        /// Admin flows may pass an existing vendor id.
         public Guid? VendorId { get; set; }
 
         /// <summary>Admin-only fallback: create/match vendor by name when VendorId is not set.</summary>

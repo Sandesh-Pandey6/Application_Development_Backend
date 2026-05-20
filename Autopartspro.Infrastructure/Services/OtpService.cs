@@ -45,9 +45,9 @@ namespace Autopartspro.Infrastructure.Services
             await _context.SaveChangesAsync();
 
             // Dev fallback: always log OTP (also sent by email when SMTP is configured)
-            Console.WriteLine($"\n==========================================");
+            Console.WriteLine($"\n");
             Console.WriteLine($"OTP FOR {email}: {otpCode} (purpose: {purpose})");
-            Console.WriteLine($"==========================================\n");
+            Console.WriteLine($"\n");
 
             try
             {

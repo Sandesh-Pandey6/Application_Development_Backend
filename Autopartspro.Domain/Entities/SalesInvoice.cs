@@ -14,7 +14,7 @@ namespace Autopartspro.Domain.Entities
         public decimal TotalAmount { get; set; }
         public PaymentStatus PaymentStatus { get; set; } = PaymentStatus.Unpaid;
         public DateTime SaleDate { get; set; }
-        /// <summary>Set when the 3-day overdue in-app + email reminder was sent.</summary>
+        //Set when the 3-day overdue in-app + email reminder was sent.
         public DateTime? OverdueReminderSentAt { get; set; }
 
         // Navigation Properties

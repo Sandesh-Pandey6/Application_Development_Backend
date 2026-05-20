@@ -6,9 +6,9 @@ using Microsoft.Extensions.Hosting;
 
 namespace Autopartspro.Infrastructure.Data;
 
-/// <summary>
+
 /// Development-only: ensures testUser2 has an unpaid sales invoice dated 3+ days ago for overdue reminder testing.
-/// </summary>
+
 public static class DevelopmentOverdueTestBootstrap
 {
     public const string TestInvoiceNumber = "SI-DEV-OVERDUE-TEST";

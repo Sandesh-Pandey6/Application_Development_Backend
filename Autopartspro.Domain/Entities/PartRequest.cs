@@ -10,7 +10,7 @@ namespace Autopartspro.Domain.Entities
         public string VehicleModel { get; set; } = string.Empty;
         public UrgencyLevel UrgencyLevel { get; set; }
         public PartRequestStatus Status { get; set; } = PartRequestStatus.Pending;
-        /// <summary>When staff expects the part to be available.</summary>
+        ///When staff expects the part to be available.
         public DateOnly? EstimatedAvailableDate { get; set; }
         public string? StaffNotes { get; set; }
         public DateTime? StaffRespondedAt { get; set; }

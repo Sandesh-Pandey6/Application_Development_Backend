@@ -3,9 +3,9 @@ using Microsoft.AspNetCore.Mvc.Filters;
 
 namespace Autopartspro.API.Filters;
 
-/// <summary>
+
 /// Turns business-rule exceptions into 400/401/404 JSON so the React app can show { message }.
-/// </summary>
+
 public class ApiExceptionFilter : IExceptionFilter
 {
     public void OnException(ExceptionContext context)
